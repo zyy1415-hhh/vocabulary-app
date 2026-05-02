@@ -1,14 +1,93 @@
 // ===== 配置 =====
 var BUILTIN = [];
 
-// ===== 状态 =====
-var words = loadWords();
-var queue = [];
-var qi = 0;
-var sentIdx = 0;
-var showingAnswer = false;
-var doneToday = 0;
-var typingMode = false;
+// ===== 多单词本状态 =====
+var wordbooks = [];       // [{id, name, words: [...]}]
+var activeWbId = null;    // 当前激活的单词本 ID
+var words = [];           // 始终指向当前单词本的 words（引用）
+var viewingList = false;  // 是否正在查看某个单词本内的单词列表
+
+// ===== 单词本持久化 =====
+function saveWordbooks() {
+    localStorage.setItem('vl_wordbooks', JSON.stringify(wordbooks));
+}
+
+function loadWordbooks() {
+    var saved = localStorage.getItem('vl_wordbooks');
+    if (saved) {
+        try {
+            wordbooks = JSON.parse(saved);
+        } catch (e) {
+            wordbooks = [];
+        }
+        // 迁移：旧数据没有 id 的加上 id
+        wordbooks.forEach(function (wb) {
+            if (!wb.id) wb.id = 'wb_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+            if (!wb.words) wb.words = [];
+        });
+    }
+    if (wordbooks.length === 0) {
+        // 从旧版 vl_words 迁移
+        var oldWords = [];
+        try {
+            var s = localStorage.getItem('vl_words');
+            if (s) oldWords = JSON.parse(s);
+        } catch (e) {}
+        if (oldWords.length === 0) oldWords = BUILTIN.map(function (b) {
+            return mkW(b.w, b.p, b.m, b.s);
+        });
+        wordbooks = [{
+            id: 'wb_default',
+            name: '默认词库',
+            words: oldWords
+        }];
+        try { localStorage.removeItem('vl_words'); } catch (e) {}
+    }
+    // 默认选第一个
+    if (!activeWbId && wordbooks.length > 0) activeWbId = wordbooks[0].id;
+    syncWords();
+    saveWordbooks();
+}
+
+function syncWords() {
+    var wb = wordbooks.find(function (w) { return w.id === activeWbId; });
+    words = wb ? wb.words : [];
+}
+
+function saveWords() {
+    syncWords();
+    saveWordbooks();
+}
+
+function getActiveWb() {
+    return wordbooks.find(function (w) { return w.id === activeWbId; }) || null;
+}
+
+// ===== 创建/删除/重命名单词本 =====
+function createWordbook(name) {
+    var wb = {
+        id: 'wb_' + Date.now(),
+        name: name,
+        words: []
+    };
+    wordbooks.push(wb);
+    saveWordbooks();
+    return wb;
+}
+
+function deleteWordbook(id) {
+    if (wordbooks.length <= 1) { alert('至少保留一个单词本'); return; }
+    wordbooks = wordbooks.filter(function (w) { return w.id !== id; });
+    if (activeWbId === id) activeWbId = wordbooks[0].id;
+    syncWords();
+    saveWordbooks();
+}
+
+function renameWordbook(id, newName) {
+    var wb = wordbooks.find(function (w) { return w.id === id; });
+    if (wb) wb.name = newName;
+    saveWordbooks();
+}
 
 // ===== 工具函数 =====
 function mkW(w, p, m, s) {
@@ -31,22 +110,171 @@ function today() {
     return new Date().toISOString().split("T")[0];
 }
 
-function loadWords() {
-    var s = localStorage.getItem("vl_words");
-    if (s) return JSON.parse(s);
-    return BUILTIN.map(function (b) {
-        return mkW(b.w, b.p, b.m, b.s);
+// ===== 单词本列表渲染 =====
+function renderWordbookList() {
+    viewingList = false;
+    var area = document.getElementById("listArea");
+    if (wordbooks.length === 0) {
+        area.innerHTML = '<div class="empty"><div class="ic">📖</div>还没有单词本，快去创建一个吧</div>';
+        return;
+    }
+    var h = '';
+    wordbooks.forEach(function (wb) {
+        var dueCount = (wb.words || []).filter(function (w) {
+            return w.nextReview <= today();
+        }).length;
+        h += '<div class="wb-card fade-up" onclick="openWordbook(\'' + wb.id + '\')">' +
+                '<div class="wb-info">' +
+                    '<div class="wb-name">' + escH(wb.name) + '</div>' +
+                    '<div class="wb-meta">' + (wb.words || []).length + ' 词 · ' + dueCount + ' 待复习</div>' +
+                '</div>' +
+                '<div class="wb-actions">' +
+                    '<button class="wb-action-btn" onclick="event.stopPropagation();renameWbPrompt(\'' + wb.id + '\')">✏️</button>' +
+                    '<button class="wb-action-btn" onclick="event.stopPropagation();confirmDelWb(\'' + wb.id + '\')">🗑️</button>' +
+                '</div>' +
+             '</div>';
     });
+    h += '<div class="wb-add-card fade-up" onclick="createWbPrompt()">＋ 新建单词本</div>';
+    area.innerHTML = h;
 }
 
-function saveWords() {
-    localStorage.setItem("vl_words", JSON.stringify(words));
+function openWordbook(id) {
+    activeWbId = id;
+    syncWords();
+    viewingList = true;
+    renderWordbookDetail();
+}
+
+function renderWordbookDetail() {
+    var wb = getActiveWb();
+    if (!wb) { renderWordbookList(); return; }
+    var area = document.getElementById("listArea");
+    var backBtn = '<div class="wb-back" onclick="renderWordbookList()">← 返回单词本列表</div>';
+    var header = '<div class="wb-detail-header"><h3>' + escH(wb.name) + '</h3>' +
+                 '<div class="phdr-btns">' +
+                    '<button class="btn-add btn-secondary" onclick="showImport()">📥 导入</button>' +
+                    '<button class="btn-add btn-primary" onclick="showAdd()">＋ 添加</button>' +
+                 '</div></div>';
+    if (words.length === 0) {
+        area.innerHTML = backBtn + header + '<div class="empty"><div class="ic">📖</div>这个单词本还是空的</div>';
+        return;
+    }
+    var lh = '';
+    words.forEach(function (w) {
+        var lv = ["<span class='wl-lv lv-0'>新词</span>", "<span class='wl-lv lv-1'>学习中</span>", "<span class='wl-lv lv-2'>已掌握</span>"][w.level];
+        lh += '<div class="wl-item fade-up"><div><span class="wl-word">' + escH(w.word) + '</span>' +
+            (w.phonetic ? '<span class="wl-ph">' + escH(w.phonetic) + '</span>' : '') +
+            '<div class="wl-mean">' + escH(w.meaning) + '</div></div>' +
+            '<div class="wl-right">' + lv +
+            '<button class="wl-del" onclick="delWord(' + w.id + ')">✕</button></div></div>';
+    });
+    area.innerHTML = backBtn + header + lh;
+}
+
+function confirmDelWb(id) {
+    var wb = wordbooks.find(function (w) { return w.id === id; });
+    if (!wb) return;
+    if (!confirm('确定删除单词本「' + wb.name + '」？里面的单词也会被删除。')) return;
+    deleteWordbook(id);
+    renderWordbookList();
+    updateStats();
+}
+
+function renameWbPrompt(id) {
+    var wb = wordbooks.find(function (w) { return w.id === id; });
+    if (!wb) return;
+    var name = prompt('重命名单词本：', wb.name);
+    if (name && name.trim()) {
+        renameWordbook(id, name.trim());
+        renderWordbookList();
+    }
+}
+
+function createWbPrompt() {
+    var name = prompt('新单词本名称：', '新单词本');
+    if (name && name.trim()) {
+        createWordbook(name.trim());
+        renderWordbookList();
+    }
+}
+
+// ===== 学习前选单词本 =====
+function startStudyFlow() {
+    if (wordbooks.length === 0) {
+        alert('请先创建单词本');
+        goPage('list', document.querySelectorAll('.nav-item')[2]);
+        return;
+    }
+    if (wordbooks.length === 1) {
+        activeWbId = wordbooks[0].id;
+        syncWords();
+        goPage('card', document.querySelectorAll('.nav-item')[0]);
+        return;
+    }
+    // 多个单词本，显示选择器
+    showWbSelector();
+}
+
+function showWbSelector() {
+    var h = '<div class="wb-select-modal">' +
+            '<div class="wb-select-title">选择要学习的单词本</div>';
+    wordbooks.forEach(function (wb) {
+        var dueCount = (wb.words || []).filter(function (w) { return w.nextReview <= today(); }).length;
+        h += '<div class="wb-select-item" onclick="selectWbAndStudy(\'' + wb.id + '\')">' +
+                '<span>' + escH(wb.name) + '</span>' +
+                '<span class="wb-select-due">' + dueCount + ' 待复习</span>' +
+             '</div>';
+    });
+    h += '<div class="wb-select-cancel" onclick="goPage(\'review\',document.querySelectorAll(\'.nav-item\')[1])">取消</div>' +
+         '</div>';
+    document.getElementById('cardArea').innerHTML = h;
+    document.getElementById('judgeRow').style.display = 'none';
+    document.getElementById('completeArea').innerHTML = '';
+    // 确保在 card 页面
+    document.querySelectorAll('.page').forEach(function (p) { p.classList.remove('active'); });
+    document.getElementById('pageCard').classList.add('active');
+    document.querySelectorAll('.nav-item').forEach(function (b) { b.classList.remove('active'); });
+    document.querySelectorAll('.nav-item')[0].classList.add('active');
+}
+
+function selectWbAndStudy(id) {
+    activeWbId = id;
+    syncWords();
+    renderCard();
+}
+
+// ===== 原逻辑适配 =====
+var queue = [];
+var qi = 0;
+var sentIdx = 0;
+var showingAnswer = false;
+var doneToday = 0;
+var typingMode = false;
+
+function loadWords() {
+    syncWords();
+    return words;
+}
+
+function updateStats() {
+    var activeWb = getActiveWb();
+    var wList = activeWb ? activeWb.words : [];
+    var due = wList.filter(function (w) { return w.nextReview <= today(); });
+    document.getElementById('statTotal').textContent = wList.length;
+    document.getElementById('statDue').textContent = due.length;
+    document.getElementById('statDone').textContent = doneToday;
+    var b = document.getElementById('reviewBadge');
+    if (due.length > 0) {
+        b.style.display = 'flex';
+        b.textContent = due.length;
+    } else {
+        b.style.display = 'none';
+    }
+    updateStreak();
 }
 
 function getDue() {
-    return words.filter(function (w) {
-        return w.nextReview <= today();
-    });
+    return words.filter(function (w) { return w.nextReview <= today(); });
 }
 
 // SM-2 算法
@@ -66,65 +294,45 @@ function srs(w, rem) {
     }
     var d = new Date();
     d.setDate(d.getDate() + w.interval);
-    w.nextReview = d.toISOString().split("T")[0];
+    w.nextReview = d.toISOString().split('T')[0];
     w.lastReview = today();
     return w;
 }
 
 function escH(s) {
-    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function escJ(s) {
-    return s.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
 function escRe(s) {
-    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 // ===== UI 更新 =====
-function updateStats() {
-    var due = getDue();
-    document.getElementById("statTotal").textContent = words.length;
-    document.getElementById("statDue").textContent = due.length;
-    document.getElementById("statDone").textContent = doneToday;
-    var b = document.getElementById("reviewBadge");
-    if (due.length > 0) {
-        b.style.display = "flex";
-        b.textContent = due.length;
-    } else {
-        b.style.display = "none";
-    }
-    updateStreak();
-}
-
 function updateStreak() {
     var s = 0, base = new Date();
     for (var i = 0; i < 365; i++) {
         var d = new Date(base);
         d.setDate(d.getDate() - i);
-        var ds = d.toISOString().split("T")[0];
-        var log = JSON.parse(localStorage.getItem("vl_log_" + ds) || "[]");
+        var ds = d.toISOString().split('T')[0];
+        var log = JSON.parse(localStorage.getItem('vl_log_' + ds) || '[]');
         if (log.length > 0) s++;
         else if (i > 0) break;
     }
-    document.getElementById("streakBadge").textContent = "🔥 " + s + "天";
+    document.getElementById('streakBadge').textContent = '🔥 ' + s + '天';
 }
 
 // ===== 模式切换 =====
 function switchMode() {
     typingMode = !typingMode;
-    var btn = document.getElementById("toggleBtn");
-    var labels = document.querySelectorAll(".mode-label");
+    var btn = document.getElementById('toggleBtn');
     if (typingMode) {
-        btn.classList.add("active");
-        labels[0].textContent = "点选模式";
-        labels[1].textContent = "打字模式 ✓";
+        btn.classList.add('active');
     } else {
-        btn.classList.remove("active");
-        labels[0].textContent = "点选模式";
-        labels[1].textContent = "打字模式";
+        btn.classList.remove('active');
     }
     if (queue.length > 0) {
         showingAnswer = false;
@@ -134,15 +342,20 @@ function switchMode() {
 
 // ===== 卡片渲染 =====
 function renderCard() {
+    if (!activeWbId || wordbooks.length === 0) {
+        startStudyFlow();
+        return;
+    }
+    syncWords();
     queue = getDue();
     qi = 0;
     sentIdx = 0;
     showingAnswer = false;
-    document.getElementById("judgeRow").style.display = "none";
-    document.getElementById("completeArea").innerHTML = "";
+    document.getElementById('judgeRow').style.display = 'none';
+    document.getElementById('completeArea').innerHTML = '';
     if (queue.length === 0) {
-        document.getElementById("cardArea").innerHTML = "";
-        document.getElementById("completeArea").innerHTML =
+        document.getElementById('cardArea').innerHTML = '';
+        document.getElementById('completeArea').innerHTML =
             '<div class="complete fade-up"><div class="emo">🎉</div><h2>今天搞定啦！</h2><p>已完成 ' + doneToday + ' 个单词</p><button class="btn-rst" onclick="reviewAll()">🔄 复习全部词库</button></div>';
         updateProg();
         return;
@@ -151,23 +364,19 @@ function renderCard() {
 }
 
 function renderCur() {
-    if (qi >= queue.length) {
-        renderCard();
-        return;
-    }
+    if (qi >= queue.length) { renderCard(); return; }
     var w = queue[qi];
     var ts = w.sentences.length || 1;
-    var area = document.getElementById("cardArea");
+    var area = document.getElementById('cardArea');
 
     if (!showingAnswer) {
         var blanked = w.sentences[sentIdx]
             ? w.sentences[sentIdx].replace(/\{\{(\w+)\}\}/gi, '<span class="blank">________</span>')
-            : "";
-        var dots = "";
+            : '';
+        var dots = '';
         for (var i = 0; i < ts; i++) {
             dots += '<div class="s-dot' + (i === sentIdx ? ' act' : '') + '"></div>';
         }
-
         if (typingMode) {
             area.innerHTML =
                 '<div class="card fade-up" onclick="event.stopPropagation()">' +
@@ -187,7 +396,7 @@ function renderCur() {
                     '<div class="tap-hint">💡 听发音：点击🔊按钮</div>' +
                 '</div>';
             setTimeout(function () {
-                var inp = document.getElementById("typingInput");
+                var inp = document.getElementById('typingInput');
                 if (inp) inp.focus();
             }, 100);
         } else {
@@ -207,14 +416,14 @@ function renderCur() {
     } else {
         var filled = w.sentences[sentIdx]
             ? w.sentences[sentIdx].replace(/\{\{(\w+)\}\}/gi, '<span class="filled">$1</span>')
-            : "";
-        var dots2 = "";
+            : '';
+        var dots2 = '';
         for (var j = 0; j < ts; j++) {
             dots2 += '<div class="s-dot' + (j <= sentIdx ? ' act' : '') + '"></div>';
         }
         var nextBtn = (sentIdx + 1 < ts)
             ? '<button class="btn-next-sent" onclick="nextSent()">看下一句例句 →</button>'
-            : "";
+            : '';
         area.innerHTML =
             '<div class="card fade-up">' +
                 '<button class="speak-btn" onclick="event.stopPropagation();speak(\'' + escJ(w.word) + '\')">🔊</button>' +
@@ -231,23 +440,23 @@ function renderCur() {
 
 // ===== 打字检查 =====
 function checkTyping() {
-    var inp = document.getElementById("typingInput");
-    var fb = document.getElementById("typingFeedback");
+    var inp = document.getElementById('typingInput');
+    var fb = document.getElementById('typingFeedback');
     if (!inp || !fb) return;
     var val = inp.value.trim().toLowerCase();
     var w = queue[qi];
     if (!val) return;
     if (val === w.word) {
-        fb.className = "typing-feedback correct";
-        fb.textContent = "✅ 正确！";
+        fb.className = 'typing-feedback correct';
+        fb.textContent = '✅ 正确！';
         setTimeout(function () {
             showingAnswer = true;
             renderCur();
         }, 800);
     } else {
-        fb.className = "typing-feedback wrong";
-        fb.textContent = "❌ 不对，正确答案是：" + w.word;
-        inp.value = "";
+        fb.className = 'typing-feedback wrong';
+        fb.textContent = '❌ 不对，正确答案是：' + w.word;
+        inp.value = '';
         setTimeout(function () { if (inp) inp.focus(); }, 100);
     }
 }
@@ -256,7 +465,7 @@ function flipCard() {
     if (!showingAnswer) {
         showingAnswer = true;
         renderCur();
-        document.getElementById("judgeRow").style.display = "flex";
+        document.getElementById('judgeRow').style.display = 'flex';
     }
 }
 
@@ -271,8 +480,8 @@ function nextSent() {
 function updateProg() {
     var total = Math.max(queue.length, 1);
     var pct = Math.round(qi / total * 100);
-    document.getElementById("progFill").style.width = pct + "%";
-    document.getElementById("progFrac").textContent = Math.min(qi + 1, total) + "/" + total;
+    document.getElementById('progFill').style.width = pct + '%';
+    document.getElementById('progFrac').textContent = Math.min(qi + 1, total) + '/' + total;
 }
 
 function judge(rem) {
@@ -284,14 +493,14 @@ function judge(rem) {
     doneToday++;
     logToday(w.id);
     updateStats();
-    var card = document.querySelector(".card");
+    var card = document.querySelector('.card');
     if (card) {
-        card.classList.add(rem ? "slide-out-l" : "slide-out-r");
+        card.classList.add(rem ? 'slide-out-l' : 'slide-out-r');
         setTimeout(function () {
             qi++;
             sentIdx = 0;
             showingAnswer = false;
-            document.getElementById("judgeRow").style.display = "none";
+            document.getElementById('judgeRow').style.display = 'none';
             if (qi >= queue.length) renderCard();
             else renderCur();
         }, 180);
@@ -300,9 +509,9 @@ function judge(rem) {
 
 function logToday(id) {
     var ds = today();
-    var log = JSON.parse(localStorage.getItem("vl_log_" + ds) || "[]");
+    var log = JSON.parse(localStorage.getItem('vl_log_' + ds) || '[]');
     log.push({ id: id });
-    localStorage.setItem("vl_log_" + ds, JSON.stringify(log));
+    localStorage.setItem('vl_log_' + ds, JSON.stringify(log));
 }
 
 function reviewAll() {
@@ -314,66 +523,45 @@ function reviewAll() {
 
 // ===== 页面导航 =====
 function goPage(name, btn) {
-    document.querySelectorAll(".page").forEach(function (p) { p.classList.remove("active"); });
-    document.querySelectorAll(".nav-item").forEach(function (b) { b.classList.remove("active"); });
-    document.getElementById("page" + name.charAt(0).toUpperCase() + name.slice(1)).classList.add("active");
-    if (btn) btn.classList.add("active");
-    if (name === "card") renderCard();
-    if (name === "list") renderList();
-    if (name === "review") renderReview();
+    document.querySelectorAll('.page').forEach(function (p) { p.classList.remove('active'); });
+    document.querySelectorAll('.nav-item').forEach(function (b) { b.classList.remove('active'); });
+    document.getElementById('page' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
+    if (btn) btn.classList.add('active');
+    if (name === 'card') {
+        // 点"背单词"时，先选择单词本
+        startStudyFlow();
+    }
+    if (name === 'list') renderWordbookList();
+    if (name === 'review') renderReview();
 }
 
 function renderList() {
-    var area = document.getElementById("listArea");
-    if (words.length === 0) {
-        area.innerHTML = '<div class="empty"><div class="ic">📖</div>还没有单词，快去添加吧</div>';
-        return;
-    }
-    var h = "";
-    words.forEach(function (w) {
-        var lv = ["<span class='wl-lv lv-0'>新词</span>", "<span class='wl-lv lv-1'>学习中</span>", "<span class='wl-lv lv-2'>已掌握</span>"][w.level];
-        h += '<div class="wl-item fade-up"><div><span class="wl-word">' + escH(w.word) + '</span>' +
-            (w.phonetic ? '<span class="wl-ph">' + escH(w.phonetic) + '</span>' : '') +
-            '<div class="wl-mean">' + escH(w.meaning) + '</div></div>' +
-            '<div class="wl-right">' + lv +
-            '<button class="wl-del" onclick="delWord(' + w.id + ')">✕</button></div></div>';
-    });
-    area.innerHTML = h;
+    if (viewingList) renderWordbookDetail();
+    else renderWordbookList();
 }
 
-function delWord(id) {
-    if (!confirm("确定删除？")) return;
-    words = words.filter(function (w) { return w.id !== id; });
-    saveWords();
-    updateStats();
-    renderList();
-}
-
-// ===== 添加单词 =====
+// ===== 添加单词（写入当前激活的单词本）=====
 function showAdd() {
-    document.getElementById("addModal").classList.add("show");
-    document.getElementById("inpWord").focus();
+    document.getElementById('addModal').classList.add('show');
+    document.getElementById('inpWord').focus();
 }
 
 function hideAdd() {
-    document.getElementById("addModal").classList.remove("show");
-    ["inpWord", "inpPhonetic", "inpMeaning", "inpSent1", "inpSent2"].forEach(function (id) {
-        document.getElementById(id).value = "";
+    document.getElementById('addModal').classList.remove('show');
+    ['inpWord', 'inpPhonetic', 'inpMeaning', 'inpSent1', 'inpSent2'].forEach(function (id) {
+        document.getElementById(id).value = '';
     });
 }
 
 function submitAdd() {
-    var w = document.getElementById("inpWord").value.trim().toLowerCase();
-    var p = document.getElementById("inpPhonetic").value.trim();
-    var m = document.getElementById("inpMeaning").value.trim();
-    var s1 = document.getElementById("inpSent1").value.trim();
-    var s2 = document.getElementById("inpSent2").value.trim();
-    if (!w || !m || !s1) {
-        alert("请至少填写单词、释义和例句");
-        return;
-    }
+    var w = document.getElementById('inpWord').value.trim().toLowerCase();
+    var p = document.getElementById('inpPhonetic').value.trim();
+    var m = document.getElementById('inpMeaning').value.trim();
+    var s1 = document.getElementById('inpSent1').value.trim();
+    var s2 = document.getElementById('inpSent2').value.trim();
+    if (!w || !m || !s1) { alert('请至少填写单词、释义和例句'); return; }
     function fix(s) {
-        if (s && !s.includes("{{")) s = s.replace(new RegExp("\\b" + escRe(w) + "\\b", "i"), "{{" + w + "}}");
+        if (s && !s.includes('{{')) s = s.replace(new RegExp('\\b' + escRe(w) + '\\b', 'i'), '{{' + w + '}}');
         return s;
     }
     var sa = [];
@@ -383,87 +571,89 @@ function submitAdd() {
     saveWords();
     updateStats();
     hideAdd();
-    renderList();
-    goPage("list", document.querySelectorAll(".nav-item")[2]);
+    if (viewingList) renderWordbookDetail(); else renderWordbookList();
 }
 
-// ===== 导入单词 =====
+// ===== 导入单词（写入当前激活的单词本）=====
 function showImport() {
-    document.getElementById("importModal").classList.add("show");
-    document.getElementById("importArea").focus();
-    document.getElementById("importMsg").className = "import-msg";
-    document.getElementById("importArea").value = "";
+    document.getElementById('importModal').classList.add('show');
+    document.getElementById('importArea').focus();
+    document.getElementById('importMsg').className = 'import-msg';
+    document.getElementById('importArea').value = '';
 }
 
 function hideImport() {
-    document.getElementById("importModal").classList.remove("show");
+    document.getElementById('importModal').classList.remove('show');
 }
 
 function doImport() {
-    var raw = document.getElementById("importArea").value.trim();
-    var msg = document.getElementById("importMsg");
+    var raw = document.getElementById('importArea').value.trim();
+    var msg = document.getElementById('importMsg');
     if (!raw) {
-        msg.className = "import-msg err";
-        msg.textContent = "请粘贴单词数据";
+        msg.className = 'import-msg err';
+        msg.textContent = '请粘贴单词数据';
         return;
     }
-    var lines = raw.split("\n").map(function (l) { return l.trim(); }).filter(function (l) { return l; });
+    var lines = raw.split('\n').map(function (l) { return l.trim(); }).filter(function (l) { return l; });
     var count = 0, errs = [];
     lines.forEach(function (line, li) {
-        var parts = line.split("|").map(function (p) { return p.trim(); }).filter(function (p) { return p; });
-        if (parts.length < 3) {
-            errs.push("第" + (li + 1) + "行格式不正确");
-            return;
-        }
+        var parts = line.split('|').map(function (p) { return p.trim(); }).filter(function (p) { return p; });
+        if (parts.length < 3) { errs.push('第' + (li + 1) + '行格式不正确'); return; }
         var w = parts[0].toLowerCase(), m = parts[1], sa = [];
         for (var i = 2; i < parts.length; i++) {
             var s = parts[i];
-            if (s && !s.includes("{{")) s = s.replace(new RegExp("\\b" + escRe(w) + "\\b", "i"), "{{" + w + "}}");
+            if (s && !s.includes('{{')) s = s.replace(new RegExp('\\b' + escRe(w) + '\\b', 'i'), '{{' + w + '}}');
             if (s) sa.push(s);
         }
-        if (!w || !m || sa.length === 0) {
-            errs.push("第" + (li + 1) + "行缺少必要信息");
-            return;
-        }
-        words.push(mkW(w, "", m, sa));
+        if (!w || !m || sa.length === 0) { errs.push('第' + (li + 1) + '行缺少必要信息'); return; }
+        words.push(mkW(w, '', m, sa));
         count++;
     });
     saveWords();
     updateStats();
     if (errs.length > 0) {
-        msg.className = "import-msg err";
-        msg.textContent = "成功导入 " + count + " 个，失败 " + errs.length + " 个。" + (errs[0] || "");
+        msg.className = 'import-msg err';
+        msg.textContent = '成功导入 ' + count + ' 个，失败 ' + errs.length + ' 个。' + (errs[0] || '');
     } else {
-        msg.className = "import-msg ok";
-        msg.textContent = "✅ 成功导入 " + count + " 个单词！";
+        msg.className = 'import-msg ok';
+        msg.textContent = '✅ 成功导入 ' + count + ' 个单词！';
         setTimeout(function () {
             hideImport();
-            renderList();
-            goPage("list", document.querySelectorAll(".nav-item")[2]);
+            if (viewingList) renderWordbookDetail(); else renderWordbookList();
         }, 800);
     }
 }
 
+// ===== 删除单词 =====
+function delWord(id) {
+    if (!confirm('确定删除？')) return;
+    var idx = words.findIndex(function (w) { return w.id === id; });
+    if (idx !== -1) words.splice(idx, 1);
+    saveWords();
+    updateStats();
+    if (viewingList) renderWordbookDetail(); else renderWordbookList();
+}
+
 // ===== 复习页面 =====
 function renderReview() {
-    document.getElementById("reviewNum").textContent = getDue().length;
+    var activeWb = getActiveWb();
+    var wList = activeWb ? activeWb.words : [];
+    document.getElementById('reviewNum').textContent = wList.filter(function (w) { return w.nextReview <= today(); }).length;
     renderCal();
 }
 
 function renderCal() {
-    var area = document.getElementById("calArea");
-    var dns = ["日", "一", "二", "三", "四", "五", "六"];
+    var area = document.getElementById('calArea');
+    var dns = ['日', '一', '二', '三', '四', '五', '六'];
     var base = new Date();
     var h = '<div class="cal-title">📅 学习记录</div><div class="cal-grid">';
-    dns.forEach(function (d) {
-        h += '<div class="cal-hdr">' + d + '</div>';
-    });
+    dns.forEach(function (d) { h += '<div class="cal-hdr">' + d + '</div>'; });
     for (var i = 27; i >= 0; i--) {
         var d = new Date(base);
         d.setDate(d.getDate() - i);
-        var ds = d.toISOString().split("T")[0];
-        var log = JSON.parse(localStorage.getItem("vl_log_" + ds) || "[]");
-        var cls = "cal-day" + (log.length > 0 ? " done" : "") + (ds === today() ? " today" : "");
+        var ds = d.toISOString().split('T')[0];
+        var log = JSON.parse(localStorage.getItem('vl_log_' + ds) || '[]');
+        var cls = 'cal-day' + (log.length > 0 ? ' done' : '') + (ds === today() ? ' today' : '');
         h += '<div class="' + cls + '">' + d.getDate() + '</div>';
     }
     h += '</div>';
@@ -471,46 +661,42 @@ function renderCal() {
 }
 
 function startReview() {
-    goPage("card", document.querySelectorAll(".nav-item")[0]);
+    goPage('card', document.querySelectorAll('.nav-item')[0]);
 }
 
 // ===== 语音朗读 =====
 function speak(text) {
-    if (!("speechSynthesis" in window)) return;
+    if (!('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
     var u = new SpeechSynthesisUtterance(text);
-    u.lang = "en-US";
+    u.lang = 'en-US';
     u.rate = 0.82;
     window.speechSynthesis.speak(u);
 }
 
 // ===== 键盘快捷键 =====
-document.addEventListener("keydown", function (e) {
-    if (document.getElementById("addModal").classList.contains("show")) {
-        if (e.key === "Escape") hideAdd();
-        if (e.key === "Enter" && e.ctrlKey) submitAdd();
+document.addEventListener('keydown', function (e) {
+    if (document.getElementById('addModal').classList.contains('show')) {
+        if (e.key === 'Escape') hideAdd();
+        if (e.key === 'Enter' && e.ctrlKey) submitAdd();
         return;
     }
-    if (document.getElementById("importModal").classList.contains("show")) {
-        if (e.key === "Escape") hideImport();
+    if (document.getElementById('importModal').classList.contains('show')) {
+        if (e.key === 'Escape') hideImport();
         return;
     }
-    if (typingMode && document.getElementById("typingInput")) {
-        if (e.key === "Enter") {
-            e.preventDefault();
-            checkTyping();
-        }
+    if (typingMode && document.getElementById('typingInput')) {
+        if (e.key === 'Enter') { e.preventDefault(); checkTyping(); }
         return;
     }
-    if (e.key === " " || e.key === "Enter") {
-        e.preventDefault();
-        if (!showingAnswer) flipCard();
-    }
-    if (e.key === "ArrowLeft" || e.key === "a") { e.preventDefault(); judge(false); }
-    if (e.key === "ArrowRight" || e.key === "d") { e.preventDefault(); judge(true); }
-    if (e.key === "n" && showingAnswer) nextSent();
+    if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); if (!showingAnswer) flipCard(); }
+    if (e.key === 'ArrowLeft' || e.key === 'a') { e.preventDefault(); judge(false); }
+    if (e.key === 'ArrowRight' || e.key === 'd') { e.preventDefault(); judge(true); }
+    if (e.key === 'n' && showingAnswer) nextSent();
 });
 
 // ===== 启动 =====
+loadWordbooks();
 updateStats();
-renderCard();
+// 不直接 renderCard，等用户点"背单词"
+document.getElementById('cardArea').innerHTML = '<div class="complete fade-up"><div class="emo">👋</div><h2>选择一个单词本开始学习</h2><p>点击下方「背单词」按钮开始</p></div>';
