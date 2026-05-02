@@ -3,834 +3,324 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>VocabLift · 填空背单词</title>
+<title>VocabLift</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  :root {
-    --bg: #06060f; --surface: #111125; --surface2: #1a1a35;
-    --border: rgba(255,255,255,0.06);
-    --purple: #a78bfa; --purple-dim: rgba(167,139,250,0.12);
-    --green: #4ade80; --green-dim: rgba(74,222,128,0.10);
-    --red: #f87171; --red-dim: rgba(248,113,113,0.10);
-    --yellow: #facc15; --blue: #60a5fa;
-    --text: #e2e8f0; --text-dim: #4a5568;
-  }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-    background: var(--bg); color: var(--text);
-    min-height: 100vh; -webkit-tap-highlight-color: transparent;
-  }
-  .app { max-width: 540px; margin: 0 auto; padding: 0 16px 100px; }
-
-  /* Top Bar */
-  .topbar {
-    position: sticky; top: 0; z-index: 10;
-    background: rgba(6,6,15,0.92); backdrop-filter: blur(18px);
-    padding: 14px 0 10px; display: flex; align-items: center; justify-content: space-between;
-  }
-  .topbar .logo { font-size: 19px; font-weight: 800; letter-spacing: -0.3px; }
-  .topbar .logo b { color: var(--purple); }
-  .topbar-right { display: flex; align-items: center; gap: 10px; }
-  .days-badge {
-    font-size: 12px; color: var(--yellow); background: rgba(250,204,21,0.08);
-    padding: 3px 10px; border-radius: 20px; font-weight: 600;
-  }
-
-  /* Stats */
-  .stats { display: flex; gap: 8px; margin: 14px 0 18px; }
-  .stat { flex: 1; text-align: center; padding: 10px 2px; background: var(--surface); border-radius: 12px; border: 1px solid var(--border); }
-  .stat .v { font-size: 19px; font-weight: 700; }
-  .stat .l { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
-  .stat-total .v { color: var(--purple); }
-  .stat-due .v { color: var(--yellow); }
-  .stat-done .v { color: var(--green); }
-
-  /* Progress */
-  .prog { margin-bottom: 18px; }
-  .prog-top { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-dim); margin-bottom: 5px; }
-  .prog-track { height: 3px; background: var(--surface); border-radius: 4px; overflow: hidden; }
-  .prog-fill { height: 100%; background: linear-gradient(90deg, var(--purple), #c084fc); border-radius: 4px; transition: width 0.4s; }
-
-  /* Card */
-  .card-area { margin-bottom: 18px; }
-
-  .card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 20px; padding: 28px 22px; min-height: 270px;
-    display: flex; flex-direction: column; justify-content: center;
-    position: relative; overflow: hidden; cursor: pointer;
-    transition: transform 0.15s; user-select: none;
-  }
-  .card:active { transform: scale(0.985); }
-
-  .card-deco { position: absolute; right: -20px; top: -20px; font-size: 100px; font-weight: 900; color: rgba(167,139,250,0.03); pointer-events: none; font-family: Georgia, serif; }
-
-  /* Front */
-  .hint-label { font-size: 11px; font-weight: 700; color: var(--purple); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 14px; display: flex; align-items: center; gap: 6px; }
-  .sentence { font-size: 19px; line-height: 1.75; color: var(--text); margin-bottom: 16px; }
-  .blank { display: inline; border-bottom: 2px dashed var(--purple); color: var(--purple); font-weight: 600; padding: 0 2px; }
-  .hint-box { background: var(--purple-dim); border-radius: 10px; padding: 11px 14px; margin-top: 4px; }
-  .hint-box .hl { font-size: 11px; color: var(--purple); font-weight: 700; margin-bottom: 3px; }
-  .hint-box .hm { font-size: 14px; color: var(--text); }
-  .sentence-nav { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
-  .sentence-nav .s-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.1); }
-  .sentence-nav .s-dot.active { background: var(--purple); }
-  .sentence-nav .s-dot.done { background: var(--green); }
-  .sentence-nav .s-label { font-size: 11px; color: var(--text-dim); margin-left: auto; }
-  .tap-hint { text-align: center; color: var(--text-dim); font-size: 12px; margin-top: 18px; }
-
-  /* Back */
-  .aw { font-size: 30px; font-weight: 800; color: var(--green); margin-bottom: 2px; }
-  .aph { font-size: 14px; color: var(--text-dim); margin-bottom: 14px; }
-  .asent { font-size: 17px; line-height: 1.7; color: var(--text); padding: 14px; background: rgba(255,255,255,0.02); border-radius: 12px; margin-bottom: 12px; }
-  .asent .filled { background: var(--green-dim); color: var(--green); font-weight: 700; padding: 0 4px; border-radius: 3px; }
-  .amean { font-size: 13px; color: var(--text-dim); line-height: 1.6; padding-top: 10px; border-top: 1px solid var(--border); }
-
-  .speak-btn {
-    position: absolute; top: 14px; right: 14px;
-    background: var(--purple-dim); border: none; color: var(--purple);
-    width: 34px; height: 34px; border-radius: 50%; display: flex;
-    align-items: center; justify-content: center; cursor: pointer; font-size: 15px;
-  }
-
-  /* Judge */
-  .judge-row { display: flex; gap: 12px; margin-top: 2px; }
-  .judge-btn {
-    flex: 1; padding: 15px; border: none; border-radius: 14px;
-    font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.12s;
-  }
-  .judge-btn:active { transform: scale(0.96); }
-  .btn-hard { background: var(--red-dim); color: var(--red); }
-  .btn-good { background: var(--green-dim); color: var(--green); }
-
-  /* Complete */
-  .complete { text-align: center; padding: 44px 16px; }
-  .complete .em { font-size: 50px; margin-bottom: 14px; }
-  .complete h2 { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
-  .complete p { color: var(--text-dim); font-size: 13px; margin-bottom: 20px; }
-  .complete .btn-rst {
-    background: var(--purple-dim); color: var(--purple); border: none;
-    padding: 11px 28px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer;
-  }
-
-  /* Nav */
-  .bottom-nav {
-    position: fixed; bottom: 0; left: 0; right: 0;
-    background: rgba(6,6,15,0.95); backdrop-filter: blur(18px);
-    border-top: 1px solid var(--border);
-    display: flex; justify-content: space-around;
-    padding: 7px 0 max(7px, env(safe-area-inset-bottom));
-    max-width: 540px; margin: 0 auto; left: 50%; transform: translateX(-50%);
-  }
-  .nav-item {
-    background: none; border: none; color: var(--text-dim);
-    display: flex; flex-direction: column; align-items: center; gap: 1px;
-    padding: 5px 18px; border-radius: 10px; cursor: pointer;
-    font-size: 10px; font-weight: 500; transition: color 0.2s; position: relative;
-  }
-  .nav-item.active { color: var(--purple); }
-  .nav-item svg { width: 21px; height: 21px; }
-  .nav-badge {
-    position: absolute; top: 1px; right: 10px; background: var(--red);
-    color: #fff; font-size: 9px; min-width: 14px; height: 14px;
-    border-radius: 7px; display: flex; align-items: center; justify-content: center; padding: 0 3px;
-  }
-
-  /* Pages */
-  .page { display: none; }
-  .page.active { display: block; }
-
-  /* Word List */
-  .phdr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-  .phdr h2 { font-size: 17px; font-weight: 700; }
-  .btn-add {
-    background: var(--purple); color: #fff; border: none;
-    padding: 7px 14px; border-radius: 9px; font-size: 12px; font-weight: 600; cursor: pointer;
-  }
-  .wl-item {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 12px; padding: 13px 14px; margin-bottom: 7px;
-    display: flex; justify-content: space-between; align-items: center;
-  }
-  .wl-l .wl-w { font-size: 14px; font-weight: 700; }
-  .wl-l .wl-p { font-size: 11px; color: var(--text-dim); margin-left: 5px; }
-  .wl-l .wl-m { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
-  .wl-r { display: flex; align-items: center; gap: 7px; }
-  .wl-lv { font-size: 10px; padding: 2px 7px; border-radius: 5px; font-weight: 700; }
-  .lv-0 { background: var(--purple-dim); color: var(--purple); }
-  .lv-1 { background: rgba(250,204,21,0.10); color: var(--yellow); }
-  .lv-2 { background: var(--green-dim); color: var(--green); }
-  .wl-del { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 15px; padding: 2px 4px; }
-  .wl-del:hover { color: var(--red); }
-  .empty { text-align: center; padding: 50px 16px; color: var(--text-dim); }
-  .empty .ic { font-size: 42px; margin-bottom: 10px; }
-
-  /* Modal Overlay */
-  .modal-ov {
-    display: none; position: fixed; inset: 0; z-index: 200;
-    background: rgba(0,0,0,0.65); align-items: center; justify-content: center; padding: 16px;
-  }
-  .modal-ov.show { display: flex; }
-  .modal {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 20px; padding: 22px; width: 100%; max-width: 440px;
-    max-height: 85vh; overflow-y: auto;
-  }
-  .modal h3 { font-size: 16px; font-weight: 700; margin-bottom: 14px; }
-  .modal label { display: block; font-size: 11px; font-weight: 700; color: var(--text-dim); margin-bottom: 4px; margin-top: 10px; }
-  .modal input, .modal textarea {
-    width: 100%; background: var(--bg); border: 1px solid var(--border);
-    border-radius: 9px; padding: 10px 12px; color: var(--text);
-    font-size: 14px; outline: none; font-family: inherit;
-  }
-  .modal input:focus, .modal textarea:focus { border-color: var(--purple); }
-  .modal textarea { min-height: 60px; resize: vertical; }
-  .modal .hint { font-size: 10px; color: var(--text-dim); margin-top: 3px; line-height: 1.5; }
-  .modal-btns { display: flex; gap: 9px; margin-top: 16px; }
-  .modal-btns button {
-    flex: 1; padding: 11px; border: none; border-radius: 10px;
-    font-size: 13px; font-weight: 600; cursor: pointer;
-  }
-  .mb-cancel { background: var(--bg); color: var(--text-dim); }
-  .mb-submit { background: var(--purple); color: #fff; }
-
-  /* Import Modal Extra */
-  .import-area {
-    width: 100%; background: var(--bg); border: 1px solid var(--border);
-    border-radius: 10px; padding: 12px; color: var(--text);
-    font-size: 13px; font-family: inherit; outline: none;
-    min-height: 140px; resize: vertical; line-height: 1.6;
-  }
-  .import-area:focus { border-color: var(--purple); }
-  .import-format {
-    background: var(--bg); border-radius: 10px; padding: 12px; margin-top: 10px;
-    font-size: 11px; color: var(--text-dim); line-height: 1.7;
-  }
-  .import-format code { color: var(--purple); background: rgba(167,139,250,0.1); padding: 0 4px; border-radius: 3px; font-size: 11px; }
-  .import-msg { font-size: 12px; margin-top: 8px; padding: 8px 12px; border-radius: 8px; display: none; }
-  .import-msg.ok { display: block; background: var(--green-dim); color: var(--green); }
-  .import-msg.err { display: block; background: var(--red-dim); color: var(--red); }
-
-  /* Animations */
-  @keyframes fadeUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
-  .fade-up { animation: fadeUp 0.28s ease-out; }
-  @keyframes slideOutL { to { opacity:0; transform:translateX(-30px) scale(0.96); } }
-  @keyframes slideOutR { to { opacity:0; transform:translateX(30px) scale(0.96); } }
-  .slide-out-l { animation: slideOutL 0.18s ease-in forwards; }
-  .slide-out-r { animation: slideOutR 0.18s ease-in forwards; }
-
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0a1a;--surface:#141428;--border:rgba(255,255,255,.07);--purple:#a78bfa;--pdim:rgba(167,139,250,.13);--green:#4ade80;--gdim:rgba(74,222,128,.11);--red:#f87171;--rdim:rgba(248,113,113,.11);--yellow:#facc15;--text:#e2e8f0;--dim:#64748b}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-tap-highlight-color:transparent}
+.app{max-width:520px;margin:0 auto;padding:0 16px 100px}
+.topbar{position:sticky;top:0;z-index:10;background:rgba(10,10,26,.92);backdrop-filter:blur(18px);padding:14px 0 10px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-size:20px;font-weight:800;letter-spacing:-.4px}.logo b{color:var(--purple)}
+.streak{font-size:12px;color:var(--yellow);background:rgba(250,204,21,.08);padding:3px 10px;border-radius:20px;font-weight:600}
+.stats{display:flex;gap:8px;margin:14px 0 18px}
+.stat{flex:1;text-align:center;padding:10px 4px;background:var(--surface);border-radius:12px;border:1px solid var(--border)}
+.stat .v{font-size:20px;font-weight:700}.stat .l{font-size:11px;color:var(--dim);margin-top:2px}
+.s-total .v{color:var(--purple)}.s-due .v{color:var(--yellow)}.s-done .v{color:var(--green)}
+.prog{margin-bottom:18px}.prog-top{display:flex;justify-content:space-between;font-size:11px;color:var(--dim);margin-bottom:5px}
+.prog-track{height:3px;background:var(--surface);border-radius:4px;overflow:hidden}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--purple),#c084fc);border-radius:4px;transition:width .4s}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px 22px;min-height:260px;display:flex;flex-direction:column;justify-content:center;position:relative;overflow:hidden;cursor:pointer;transition:transform .15s;user-select:none;margin-bottom:18px}
+.card:active{transform:scale(.985)}
+.card-deco{position:absolute;right:-24px;top:-24px;font-size:110px;font-weight:900;color:rgba(167,139,250,.03);pointer-events:none;font-family:Georgia,serif}
+.hint-label{font-size:11px;font-weight:700;color:var(--purple);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
+.sentence{font-size:19px;line-height:1.75;color:var(--text);margin-bottom:16px}
+.blank{display:inline;border-bottom:2px dashed var(--purple);color:var(--purple);font-weight:600;padding:0 2px}
+.hint-box{background:var(--pdim);border-radius:10px;padding:11px 14px;margin-top:4px}
+.hint-box .hl{font-size:11px;color:var(--purple);font-weight:700;margin-bottom:3px}
+.hint-box .hm{font-size:14px;color:var(--text)}
+.sent-nav{display:flex;align-items:center;gap:6px;margin-top:12px}
+.s-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.1);transition:background .2s}
+.s-dot.act{background:var(--purple)}.s-nav-label{font-size:11px;color:var(--dim);margin-left:auto}
+.tap-hint{text-align:center;color:var(--dim);font-size:12px;margin-top:18px}
+.aw{font-size:30px;font-weight:800;color:var(--green);margin-bottom:2px}
+.aph{font-size:14px;color:var(--dim);margin-bottom:14px}
+.asent{font-size:17px;line-height:1.7;color:var(--text);padding:14px;background:rgba(255,255,255,.02);border-radius:12px;margin-bottom:12px}
+.asent .filled{background:var(--gdim);color:var(--green);font-weight:700;padding:0 5px;border-radius:4px}
+.amean{font-size:13px;color:var(--dim);line-height:1.6;padding-top:10px;border-top:1px solid var(--border)}
+.speak-btn{position:absolute;top:14px;right:14px;background:var(--pdim);border:none;color:var(--purple);width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px}
+.btn-next-sent{width:100%;padding:10px;background:var(--pdim);color:var(--purple);border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:8px}
+.judge-row{display:flex;gap:12px;margin-top:2px}
+.judge-btn{flex:1;padding:15px;border:none;border-radius:14px;font-size:15px;font-weight:700;cursor:pointer;transition:all .12s}
+.judge-btn:active{transform:scale(.96)}
+.btn-hard{background:var(--rdim);color:var(--red)}.btn-good{background:var(--gdim);color:var(--green)}
+.complete{text-align:center;padding:44px 16px}
+.complete .em{font-size:50px;margin-bottom:14px}.complete h2{font-size:20px;font-weight:700;margin-bottom:6px}
+.complete p{color:var(--dim);font-size:13px;margin-bottom:20px}
+.complete .btn-rst{background:var(--pdim);color:var(--purple);border:none;padding:11px 28px;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer}
+.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);background:rgba(10,10,26,.95);backdrop-filter:blur(18px);border-top:1px solid var(--border);display:flex;justify-content:space-around;padding:7px 0 max(7px,env(safe-area-inset-bottom));width:100%;max-width:520px}
+.nav-item{background:none;border:none;color:var(--dim);display:flex;flex-direction:column;align-items:center;gap:1px;padding:5px 18px;border-radius:10px;cursor:pointer;font-size:10px;font-weight:500;transition:color .2s;position:relative}
+.nav-item.active{color:var(--purple)}.nav-item svg{width:21px;height:21px}
+.nav-badge{position:absolute;top:1px;right:10px;background:var(--red);color:#fff;font-size:9px;min-width:14px;height:14px;border-radius:7px;display:flex;align-items:center;justify-content:center;padding:0 3px}
+.page{display:none}.page.active{display:block}
+.phdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.phdr h2{font-size:17px;font-weight:700}.phdr-btns{display:flex;gap:8px}
+.btn-add{border:none;padding:7px 14px;border-radius:9px;font-size:12px;font-weight:600;cursor:pointer}
+.btn-primary{background:var(--purple);color:#fff}.btn-secondary{background:rgba(255,255,255,.06);color:var(--dim)}
+.wl-item{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 14px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center}
+.wl-word{font-size:14px;font-weight:700}.wl-ph{font-size:11px;color:var(--dim);margin-left:5px}
+.wl-mean{font-size:12px;color:var(--dim);margin-top:2px}.wl-right{display:flex;align-items:center;gap:7px}
+.wl-lv{font-size:10px;padding:2px 7px;border-radius:5px;font-weight:700}
+.lv-0{background:var(--pdim);color:var(--purple)}.lv-1{background:rgba(250,204,21,.1);color:var(--yellow)}.lv-2{background:var(--gdim);color:var(--green)}
+.wl-del{background:none;border:none;color:var(--dim);cursor:pointer;font-size:15px;padding:2px 4px}.wl-del:hover{color:var(--red)}
+.empty{text-align:center;padding:50px 16px;color:var(--dim)}.empty .ic{font-size:42px;margin-bottom:10px}
+.modal-ov{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.65);align-items:center;justify-content:center;padding:16px}
+.modal-ov.show{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:22px;width:100%;max-width:440px;max-height:85vh;overflow-y:auto}
+.modal h3{font-size:16px;font-weight:700;margin-bottom:14px}
+.modal label{display:block;font-size:11px;font-weight:700;color:var(--dim);margin-bottom:4px;margin-top:10px}
+.modal input,.modal textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:10px 12px;color:var(--text);font-size:14px;outline:none;font-family:inherit}
+.modal input:focus,.modal textarea:focus{border-color:var(--purple)}.modal textarea{min-height:60px;resize:vertical}
+.modal .hint{font-size:10px;color:var(--dim);margin-top:3px;line-height:1.5}
+.modal-btns{display:flex;gap:9px;margin-top:16px}.modal-btns button{flex:1;padding:11px;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer}
+.mb-cancel{background:var(--bg);color:var(--dim)}.mb-submit{background:var(--purple);color:#fff}
+.import-area{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;color:var(--text);font-size:13px;font-family:inherit;outline:none;min-height:140px;resize:vertical;line-height:1.6}
+.import-area:focus{border-color:var(--purple)}
+.import-fmt{background:var(--bg);border-radius:10px;padding:12px;margin-top:10px;font-size:11px;color:var(--dim);line-height:1.7}
+.import-fmt code{color:var(--purple);background:rgba(167,139,250,.1);padding:0 4px;border-radius:3px}
+.import-msg{font-size:12px;margin-top:8px;padding:8px 12px;border-radius:8px;display:none}
+.import-msg.ok{display:block;background:var(--gdim);color:var(--green)}
+.import-msg.err{display:block;background:var(--rdim);color:var(--red)}
+.review-hero{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:24px;text-align:center;margin-bottom:16px}
+.review-hero .rn{font-size:48px;font-weight:900;color:var(--yellow);line-height:1}
+.review-hero .rt{color:var(--dim);font-size:13px;margin-top:4px}
+.btn-start{margin-top:14px;width:100%;padding:14px;border:none;border-radius:13px;background:linear-gradient(135deg,var(--purple),#c084fc);color:#fff;font-size:15px;font-weight:700;cursor:pointer}
+.cal-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px}
+.cal-title{font-size:13px;font-weight:600;margin-bottom:10px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center}
+.cal-hdr{font-size:10px;color:var(--dim);padding:3px}
+.cal-day{aspect-ratio:1;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--dim)}
+.cal-day.done{background:var(--gdim);color:var(--green);font-weight:700}.cal-day.today{border:1px solid var(--purple)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+.fade-up{animation:fadeUp .28s ease-out}
+@keyframes slideOutL{to{opacity:0;transform:translateX(-30px) scale(.96)}}
+@keyframes slideOutR{to{opacity:0;transform:translateX(30px) scale(.96)}}
+.slide-out-l{animation:slideOutL .18s ease-in forwards}.slide-out-r{animation:slideOutR .18s ease-in forwards}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:4px}
 </style>
 </head>
 <body>
-
 <div class="app">
-  <div class="topbar">
-    <div class="logo"><b>V</b>ocabLift</div>
-    <div class="topbar-right">
-      <span class="days-badge" id="streakBadge">🔥 0天</span>
-    </div>
-  </div>
-
+  <div class="topbar"><div class="logo"><b>V</b>ocabLift</div><span class="streak" id="streakBadge">🔥 0天</span></div>
   <div class="stats">
-    <div class="stat stat-total"><div class="v" id="statTotal">0</div><div class="l">词库</div></div>
-    <div class="stat stat-due"><div class="v" id="statDue">0</div><div class="l">待复习</div></div>
-    <div class="stat stat-done"><div class="v" id="statDone">0</div><div class="l">今日完成</div></div>
+    <div class="stat s-total"><div class="v" id="statTotal">0</div><div class="l">词库</div></div>
+    <div class="stat s-due"><div class="v" id="statDue">0</div><div class="l">待复习</div></div>
+    <div class="stat s-done"><div class="v" id="statDone">0</div><div class="l">今日完成</div></div>
   </div>
-
-  <!-- Card Page -->
   <div class="page active" id="pageCard">
-    <div class="prog">
-      <div class="prog-top"><span id="progLabel">进度</span><span id="progFrac">0/0</span></div>
-      <div class="prog-track"><div class="prog-fill" id="progFill" style="width:0"></div></div>
-    </div>
+    <div class="prog"><div class="prog-top"><span>进度</span><span id="progFrac">0/0</span></div><div class="prog-track"><div class="prog-fill" id="progFill" style="width:0"></div></div></div>
     <div id="cardArea"></div>
-    <div class="judge-row" id="judgeRow" style="display:none;">
+    <div class="judge-row" id="judgeRow" style="display:none">
       <button class="judge-btn btn-hard" onclick="judge(false)">😅 没想起来</button>
       <button class="judge-btn btn-good" onclick="judge(true)">😎 记住了</button>
     </div>
     <div id="completeArea"></div>
   </div>
-
-  <!-- Review Page -->
   <div class="page" id="pageReview">
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:24px;text-align:center;margin-bottom:16px;">
-      <div style="font-size:48px;font-weight:900;color:var(--yellow);line-height:1;" id="reviewNum">0</div>
-      <div style="color:var(--text-dim);font-size:13px;margin-top:4px;">个单词今天需要复习</div>
-      <button style="margin-top:14px;width:100%;padding:14px;border:none;border-radius:13px;background:linear-gradient(135deg,var(--purple),#c084fc);color:#fff;font-size:15px;font-weight:700;cursor:pointer;" onclick="startReview()">开始复习 ✏️</button>
+    <div class="review-hero">
+      <div class="rn" id="reviewNum">0</div>
+      <div class="rt">个单词今天需要复习</div>
+      <button class="btn-start" onclick="startReview()">开始复习 ✏️</button>
     </div>
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;" id="calArea"></div>
+    <div class="cal-card" id="calArea"></div>
   </div>
-
-  <!-- List Page -->
   <div class="page" id="pageList">
-    <div class="phdr">
-      <h2>我的词库</h2>
-      <div style="display:flex;gap:8px;">
-        <button class="btn-add" style="background:rgba(255,255,255,0.06);color:var(--text-dim);" onclick="showImport()">📥 导入</button>
-        <button class="btn-add" onclick="showAdd()">＋ 添加</button>
-      </div>
-    </div>
+    <div class="phdr"><h2>我的词库</h2><div class="phdr-btns">
+      <button class="btn-add btn-secondary" onclick="showImport()">📥 导入</button>
+      <button class="btn-add btn-primary" onclick="showAdd()">＋ 添加</button>
+    </div></div>
     <div id="listArea"></div>
   </div>
 </div>
-
-<!-- Bottom Nav -->
 <nav class="bottom-nav">
-  <button class="nav-item active" onclick="goPage('card',this)">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="M8 10h8M8 14h5"/></svg>
-    背单词
-  </button>
-  <button class="nav-item" onclick="goPage('review',this)">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-    复习
-    <span class="nav-badge" id="reviewBadge" style="display:none;">0</span>
-  </button>
-  <button class="nav-item" onclick="goPage('list',this)">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
-    词库
-  </button>
+  <button class="nav-item active" onclick="goPage('card',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="M8 10h8M8 14h5"/></svg>背单词</button>
+  <button class="nav-item" onclick="goPage('review',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>复习<span class="nav-badge" id="reviewBadge" style="display:none">0</span></button>
+  <button class="nav-item" onclick="goPage('list',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>词库</button>
 </nav>
-
-<!-- Add Word Modal -->
-<div class="modal-ov" id="addModal">
-  <div class="modal">
-    <h3>添加新单词</h3>
-    <label>英文单词</label>
-    <input type="text" id="inpWord" placeholder="achieve">
-    <label>音标（可选）</label>
-    <input type="text" id="inpPhonetic" placeholder="/əˈtʃiːv/">
-    <label>中文释义</label>
-    <input type="text" id="inpMeaning" placeholder="实现，达到，完成">
-    <label>例句（把目标单词用 {{}} 包起来）</label>
-    <textarea id="inpSent1" placeholder="She finally {{achieved}} her dream of becoming a doctor."></textarea>
-    <label>例句2（可选）</label>
-    <textarea id="inpSent2" placeholder="The team {{achieved}} excellent results this quarter."></textarea>
-    <div class="modal-btns">
-      <button class="mb-cancel" onclick="hideAdd()">取消</button>
-      <button class="mb-submit" onclick="submitAdd()">添加</button>
-    </div>
+<div class="modal-ov" id="addModal"><div class="modal">
+  <h3>添加新单词</h3>
+  <label>英文单词</label><input type="text" id="inpWord" placeholder="achieve">
+  <label>音标（可选）</label><input type="text" id="inpPhonetic" placeholder="/əˈtʃiːv/">
+  <label>意大利语释义</label><input type="text" id="inpMeaning" placeholder="raggiungere, realizzare">
+  <label>例句1（用{{}}包住目标单词）</label><textarea id="inpSent1" placeholder="She finally {{achieve}}d her dream."></textarea>
+  <label>例句2（可选）</label><textarea id="inpSent2" placeholder="The team {{achieve}}d excellent results."></textarea>
+  <div class="modal-btns"><button class="mb-cancel" onclick="hideAdd()">取消</button><button class="mb-submit" onclick="submitAdd()">添加</button></div>
+</div></div>
+<div class="modal-ov" id="importModal"><div class="modal">
+  <h3>批量导入单词</h3>
+  <label>粘贴单词数据</label>
+  <textarea class="import-area" id="importArea" placeholder="粘贴到这里..."></textarea>
+  <div class="import-fmt">
+    <b>格式（每行一个单词）：</b><br>
+    <code>单词 | 意大利语释义 | 例句1 | 例句2（可选）</code><br><br>
+    示例：<br>
+    <code>improve | migliorare | We need to {{improve}} our service. | Her English has improved a lot.</code><br><br>
+    如果例句中没有{{}}，系统会自动识别并包裏目标单词。
   </div>
-</div>
-
-<!-- Import Modal -->
-<div class="modal-ov" id="importModal">
-  <div class="modal">
-    <h3>批量导入单词</h3>
-    <label>粘贴单词数据</label>
-    <textarea class="import-area" id="importArea" placeholder="粘贴到这里..."></textarea>
-    <div class="import-format">
-      <b>格式（每行一个单词）：</b><br>
-      <code>单词 | 中文释义 | 例句（用{{}}包住单词） | 例句2（可选）</code><br><br>
-      <b>示例：</b><br>
-      <code>achieve | 实现，达到 | She finally {{achieve}} her dream. | They {{achieve}} great success.</code><br><br>
-      也支持直接粘贴 <code>单词 | 释义 | 例句</code> 格式，系统会自动识别。
-    </div>
-    <div class="import-msg" id="importMsg"></div>
-    <div class="modal-btns">
-      <button class="mb-cancel" onclick="hideImport()">取消</button>
-      <button class="mb-submit" onclick="doImport()">导入</button>
-    </div>
-  </div>
-</div>
-
+  <div class="import-msg" id="importMsg"></div>
+  <div class="modal-btns"><button class="mb-cancel" onclick="hideImport()">取消</button><button class="mb-submit" onclick="doImport()">导入</button></div>
+</div></div>
 <script>
-// ============ Built-in B1-B2 Words ============
-const BUILTIN = [
-  { w:"achieve", p:"/əˈtʃiːv/", m:"实现，达到，完成",
-    s:["She finally {{achieve}} her dream of becoming a doctor.","The team {{achieve}} excellent results every year."] },
-  { w:"affect", p:"/əˈfekt/", m:"影响，使改变",
-    s:["Climate change will {{affect}} everyone on Earth.","His speech deeply {{affect}} the audience."] },
-  { w:"afford", p:"/əˈfɔːd/", m:"买得起，承担得起",
-    s:["I can't {{afford}} a new phone right now.","They finally {{afford}} to buy a house."] },
-  { w:"argue", p:"/ˈɑːɡ.juː/", m:"争论，争吵；主张",
-    s:["They often {{argue}} about politics at dinner.","She {{argue}} that education should be free."] },
-  { w:"avoid", p:"/əˈvɔɪd/", m:"避免，躲避",
-    s:["You should {{avoid}} eating too much sugar.","He tried to {{avoid}} answering the question."] },
-  { w:"believe", p:"/bɪˈliːv/", m:"相信，认为",
-    s:["I {{believe}} that hard work pays off.","Many people {{believe}} in life after death."] },
-  { w:"challenge", p:"/ˈtʃæl.ɪndʒ/", m:"挑战；质疑",
-    s:["Climbing the mountain was a real {{challenge}}.","She {{challenge}} the decision in court."] },
-  { w:"communicate", p:"/kəˈmjuː.nɪ.keɪt/", m:"沟通，交流",
-    s:["We use email to {{communicate}} with clients.","Babies {{communicate}} by crying and smiling."] },
-  { w:"compare", p:"/kəmˈpeə/", m:"比较，对比",
-    s:["It's hard to {{compare}} the two cities.","Please {{compare}} these two products."] },
-  { w:"compete", p:"/kəmˈpiːt/", m:"竞争，比赛",
-    s:["Five teams will {{compete}} in the finals.","She loves to {{compete}} in chess tournaments."] },
-  { w:"concentrate", p:"/ˈkɒn.sən.treɪt/", m:"专心，集中注意力",
-    s:["I can't {{concentrate}} with all this noise.","Please {{concentrate}} on your work."] },
-  { w:"confident", p:"/ˈkɒn.fɪ.dənt/", m:"自信的，有信心的",
-    s:["She feels {{confident}} about the interview.","He gave a {{confident}} speech."] },
-  { w:"consider", p:"/kənˈsɪd.ər/", m:"考虑，认为",
-    s:["Please {{consider}} my suggestion carefully.","I {{consider}} him a close friend."] },
-  { w:"decide", p:"/dɪˈsaɪd/", m:"决定，做出抉择",
-    s:["We need to {{decide}} by tomorrow.","She {{decide}} to study abroad."] },
-  { w:"develop", p:"/dɪˈvel.əp/", m:"发展，开发，患（病）",
-    s:["Children {{develop}} at different speeds.","The company plans to {{develop}} a new app."] },
-  { w:"discuss", p:"/dɪˈskʌs/", m:"讨论，商议",
-    s:["We need to {{discuss}} this problem together.","They {{discuss}} the plan for hours."] },
-  { w:"encourage", p:"/ɪnˈkʌr.ɪdʒ/", m:"鼓励，激励",
-    s:["Parents should {{encourage}} their children.","The teacher always {{encourage}} us."] },
-  { w:"exam", p:"/ɪɡˈzæm/", m:"考试，测验",
-    s:["I have a math {{exam}} next week.","She passed all her {{exam}}s."] },
-  { w:"exercise", p:"/ˈek.sə.saɪz/", m:"运动，锻炼；练习",
-    s:["You should {{exercise}} at least three times a week.","Do the {{exercise}} on page 42."] },
-  { w:"expect", p:"/ɪkˈspekt/", m:"期待，预料",
-    s:["I {{expect}} to finish by Friday.","Don't {{expect}} too much from him."] },
-  { w:"experience", p:"/ɪkˈspɪə.ri.əns/", m:"经验；经历",
-    s:["She has a lot of work {{experience}}.","That was an amazing {{experience}}."] },
-  { w:"familiar", p:"/fəˈmɪl.i.ər/", m:"熟悉的，通晓的",
-    s:["The song sounds very {{familiar}}.","Are you {{familiar}} with this software?"] },
-  { w:"imagine", p:"/ɪˈmædʒ.ɪn/", m:"想象，设想",
-    s:["Can you {{imagine}} life without electricity?","I can't {{imagine}} losing my job."] },
-  { w:"improve", p:"/ɪmˈpruːv/", m:"改善，提高",
-    s:["We need to {{improve}} our service.","Her English has {{improve}}d a lot."] },
-  { w:"include", p:"/ɪnˈkluːd/", m:"包括，包含",
-    s:["The price does not {{include}} tax.","The tour {{include}} a free lunch."] },
-  { w:"increase", p:"/ɪnˈkriːs/", m:"增加，增长",
-    s:["The city's population continues to {{increase}}.","Please {{increase}} the volume."] },
-  { w:"influence", p:"/ˈɪn.flu.əns/", m:"影响；影响力",
-    s:["Social media has a huge {{influence}} on teens.","His parents {{influence}} him greatly."] },
-  { w:"involve", p:"/ɪnˈvɒlv/", m:"涉及，包含；使参与",
-    s:["The project will {{involve}} a lot of travel.","Please {{involve}} everyone in the decision."] },
-  { w:"manage", p:"/ˈmæn.ɪdʒ/", m:"管理，设法做到",
-    s:["She {{manage}} a team of twenty people.","How do you {{manage}} to stay so calm?"] },
-  { w:"necessary", p:"/ˈnes.ə.ser.i/", m:"必要的，必需的",
-    s:["It's {{necessary}} to wear a seatbelt.","Is it {{necessary}} to book in advance?"] },
-  { w:"opportunity", p:"/ˌɒp.əˈtjuː.nə.ti/", m:"机会，时机",
-    s:["This is a great {{opportunity}} for you.","Don't miss this {{opportunity}}."] },
-  { w:"participate", p:"/pɑːˈtɪs.ɪ.peɪt/", m:"参与，参加",
-    s:["Everyone is welcome to {{participate}}.","She refused to {{participate}} in the game."] },
-  { w:"persuade", p:"/pəˈsweɪd/", m:"说服，劝说",
-    s:["I finally {{persuade}} him to see a doctor.","Can anyone {{persuade}} her to stay?"] },
-  { w:"prefer", p:"/prɪˈfɜː/", m:"更喜欢，宁愿",
-    s:["I {{prefer}} tea to coffee.","Which one do you {{prefer}}?"] },
-  { w:"prepare", p:"/prɪˈpeə/", m:"准备，预备",
-    s:["We need to {{prepare}} for the worst.","She is {{prepare}}ing for her exams."] },
-  { w:"prevent", p:"/prɪˈvent/", m:"防止，阻止",
-    s:["This medicine can {{prevent}} the disease.","Nothing can {{prevent}} us from trying."] },
-  { w:"promise", p:"/ˈprɒm.ɪs/", m:"承诺，答应；有希望",
-    s:["I {{promise}} to call you tomorrow.","The new technology {{promise}} great things."] },
-  { w:"protect", p:"/prəˈtekt/", m:"保护，防护",
-    s:["We must {{protect}} the environment.","Sunscreen {{protect}}s your skin."] },
-  { w:"prove", p:"/pruːv/", m:"证明，证实",
-    s:["He wanted to {{prove}} his innocence.","This study {{prove}}s the theory."] },
-  { w:"provide", p:"/prəˈvaɪd/", m:"提供，供给",
-    s:["The school will {{provide}} lunch for students.","Can you {{provide}} more details?"] },
-  { w:"recognize", p:"/ˈrek.əɡ.naɪz/", m:"认出，识别；承认",
-    s:["I didn't {{recognize}} you with glasses!","The government {{recognize}}d their contribution."] },
-  { w:"recommend", p:"/ˌrek.əˈmend/", m:"推荐，建议",
-    s:["Can you {{recommend}} a good restaurant?","I {{recommend}} reading this book."] },
-  { w:"require", p:"/rɪˈkwaɪər/", m:"需要，要求",
-    s:["The job {{require}}s a university degree.","All passengers are {{require}}d to check in."] },
-  { w:"respond", p:"/rɪˈspɒnd/", m:"回答，回应",
-    s:["He didn't {{respond}} to my email.","Please {{respond}} within 48 hours."] },
-  { w:"responsible", p:"/rɪˈspɒn.sə.bəl/", m:"负责的，有责任感的",
-    s:["Who is {{responsible}} for this project?","She is a very {{responsible}} person."] },
-  { w:"satisfy", p:"/ˈsæt.ɪs.faɪ/", m:"使满意，使满足",
-    s:["The result didn't {{satisfy}} him.","Nothing can {{satisfy}} her curiosity."] },
-  { w:"suffer", p:"/ˈsʌf.ər/", m:"遭受，忍受（痛苦）",
-    s:["Many people {{suffer}} from stress.","The city {{suffer}}ed heavy damage."] },
-  { w:"support", p:"/səˈpɔːt/", m:"支持，支撑",
-    s:["Thank you for {{support}}ing me.","The company {{support}}s local charities."] },
-  { w:"survive", p:"/səˈvaɪv/", m:"幸存，存活",
-    s:["He {{survive}}d the accident without injury.","It's hard to {{survive}} in the wild."] },
-  { w:"understand", p:"/ˌʌn.dəˈstænd/", m:"理解，懂得",
-    s:["I don't {{understand}} this question.","We need to {{understand}} each other."] },
+var BUILTIN=[
+  {w:"achieve",p:"/əˈtʃiːv/",m:"raggiungere, realizzare",s:["She finally {{achieve}}d her dream of becoming a doctor.", "The team {{achieve}}d excellent results this year."]},
+  {w:"afford",p:"/əˈfɔːd/",m:"potersi permettere",s:["I can't {{afford}} a new phone right now.", "They finally {{afford}}ed to buy a house."]},
+  {w:"agree",p:"/əˈɡriː/",m:"essere d'accordo",s:["I {{agree}} with your opinion completely.", "They finally {{agree}}d on the price."]},
+  {w:"allow",p:"/əˈlaʊ/",m:"permettere",s:["My parents don't {{allow}} me to stay out late.", "The law does not {{allow}} parking here."]},
+  {w:"argue",p:"/ˈɑːɡjuː/",m:"discutere",s:["They often {{argue}} about money.", "She {{argue}}d that education should be free."]},
+  {w:"arrange",p:"/əˈreɪndʒ/",m:"organizzare",s:["Can you {{arrange}} a meeting for tomorrow?", "I need to {{arrange}} my books by color."]},
+  {w:"arrive",p:"/əˈraɪv/",m:"arrivare",s:["We finally {{arrive}}d at the hotel at midnight.", "The package will {{arrive}} tomorrow morning."]},
+  {w:"attend",p:"/əˈtend/",m:"partecipare",s:["Everyone should {{attend}} the meeting.", "She {{attend}}ed the same school as me."]},
+  {w:"avoid",p:"/əˈvɔɪd/",m:"evitare",s:["You should {{avoid}} eating too much sugar.", "He tried to {{avoid}} answering the question."]},
+  {w:"believe",p:"/bɪˈliːv/",m:"credere",s:["I {{believe}} that honesty is very important.", "Nobody wanted to {{believe}} her story."]},
+  {w:"borrow",p:"/ˈbɒrəʊ/",m:"prendere in prestito",s:["Can I {{borrow}} your pen for a moment?", "She often {{borrow}}s books from the library."]},
+  {w:"bother",p:"/ˈbɒðə/",m:"disturbare",s:["Don't {{bother}} cooking - we can order pizza.", "He didn't {{bother}} to lock the door."]},
+  {w:"break",p:"/breɪk/",m:"rompere",s:["Be careful not to {{break}} the glass.", "Let's take a short {{break}} before continuing."]},
+  {w:"breath",p:"/breθ/",m:"respiro",s:["Take a deep {{breath}} and relax.", "He was out of {{breath}} after running."]},
+  {w:"build",p:"/bɪld/",m:"costruire",s:["They plan to {{build}} a new school here.", "She has {{build}}t a successful business."]},
+  {w:"burn",p:"/bɜːn/",m:"bruciare",s:["The fire {{burn}}ed for several hours.", "Be careful not to {{burn}} your hand."]},
+  {w:"calm",p:"/kɑːm/",m:"calmo, tranquillo",s:["Please try to stay {{calm}} during the exam.", "The sea was very {{calm}} that morning."]},
+  {w:"cause",p:"/kɔːz/",m:"causa, provocare",s:["What was the {{cause}} of the accident?", "The heavy rain {{cause}}d a flood."]},
+  {w:"challenge",p:"/ˈtʃælɪndʒ/",m:"sfida",s:["Climbing the mountain was a real {{challenge}}.", "She {{challenge}}d herself to run every day."]},
+  {w:"change",p:"/tʃeɪndʒ/",m:"cambiare",s:["The weather can {{change}} very quickly here.", "Can you give me {{change}} for a 20 euro note?"]},
+  {w:"check",p:"/tʃek/",m:"controllare",s:["Please {{check}} your email when you have time.", "I always {{check}} the door is locked."]},
+  {w:"choose",p:"/tʃuːz/",m:"scegliere",s:["You can {{choose}} any color you like.", "It's difficult to {{choose}} between the two options."]},
+  {w:"collect",p:"/kəˈlekt/",m:"raccogliere",s:["She loves to {{collect}} old postcards.", "Can you {{collect}} the kids from school?"]},
+  {w:"communicate",p:"/kəˈmjuːnɪkeɪt/",m:"comunicare",s:["We use email to {{communicate}} with clients.", "Babies {{communicate}} by crying and smiling."]},
+  {w:"compare",p:"/kəmˈpeə/",m:"confrontare",s:["It's hard to {{compare}} the two cities.", "Please {{compare}} these two options carefully."]},
+  {w:"compete",p:"/kəmˈpiːt/",m:"gareggiare",s:["Five teams will {{compete}} in the finals.", "She loves to {{compete}} in chess tournaments."]},
+  {w:"complain",p:"/kəmˈpleɪn/",m:"lamentarsi",s:["He always {{complain}}s about the weather.", "You should {{complain}} to the manager."]},
+  {w:"concentrate",p:"/ˈkɒnsəntreɪt/",m:"concentrarsi",s:["I can't {{concentrate}} with all this noise.", "Please {{concentrate}} on one task at a time."]},
+  {w:"confident",p:"/ˈkɒnfɪdənt/",m:"sicuro di se",s:["She felt {{confident}} before the interview.", "He gave a {{confident}} and clear speech."]},
+  {w:"consider",p:"/kənˈsɪdə/",m:"considerare",s:["Please {{consider}} my suggestion carefully.", "I {{consider}} him one of my closest friends."]},
+  {w:"continue",p:"/kənˈtɪnjuː/",m:"continuare",s:["The rain will {{continue}} until tomorrow.", "Please {{continue}} working on the project."]},
+  {w:"control",p:"/kənˈtrəʊl/",m:"controllare",s:["He couldn't {{control}} his anger.", "The remote {{control}} is on the table."]},
+  {w:"courage",p:"/ˈkʌrɪdʒ/",m:"coraggio",s:["It takes a lot of {{courage}} to speak in public.", "She had the {{courage}} to start a new life abroad."]},
+  {w:"curious",p:"/ˈkjʊəriəs/",m:"curioso",s:["I'm very {{curious}} about other cultures.", "The cat was {{curious}} about the box."]},
+  {w:"decide",p:"/dɪˈsaɪd/",m:"decidere",s:["We need to {{decide}} by tomorrow morning.", "She {{decide}}d to study abroad next year."]},
+  {w:"defend",p:"/dɪˈfend/",m:"difendere",s:["Soldiers are trained to {{defend}} their country.", "She tried to {{defend}} her point of view."]},
+  {w:"deliver",p:"/dɪˈlɪvə/",m:"consegnare",s:["The pizza will be {{deliver}}ed in 30 minutes.", "She {{deliver}}ed an excellent speech."]},
+  {w:"depend",p:"/dɪˈpend/",m:"dipendere",s:["The result will {{depend}} on the weather.", "You can {{depend}} on me to help you."]},
+  {w:"describe",p:"/dɪˈskraɪb/",m:"descrivere",s:["Can you {{describe}} the person you saw?", "She {{describe}}d the scene in detail."]},
+  {w:"develop",p:"/dɪˈveləp/",m:"sviluppare",s:["Children {{develop}} at different speeds.", "The company plans to {{develop}} a new app."]},
+  {w:"discuss",p:"/dɪsˈkʌs/",m:"discutere",s:["We need to {{discuss}} this issue together.", "They {{discuss}}ed the plan for two hours."]},
+  {w:"distance",p:"/ˈdɪstəns/",m:"distanza",s:["The {{distance}} from here to the station is 2 km.", "We walked a long {{distance}} today."]},
+  {w:"disturb",p:"/dɪˈstɜːb/",m:"disturbare",s:["Please don't {{disturb}} me while I'm studying.", "I'm sorry to {{disturb}} you, but it's urgent."]},
+  {w:"divide",p:"/dɪˈvaɪd/",m:"dividere",s:["Let's {{divide}} the cake into eight pieces.", "The river {{divide}}s the city in two."]},
+  {w:"double",p:"/ˈdʌbl/",m:"doppio, raddoppiare",s:["I'd like a {{double}} espresso, please.", "The price has {{double}}d in the last year."]},
+  {w:"doubt",p:"/daʊt/",m:"dubbio",s:["I have no {{doubt}} that she will succeed.", "They {{doubt}}ed his ability to finish on time."]},
+  {w:"education",p:"/ˌedʒuˈkeɪʃn/",m:"istruzione",s:["Education is very important for a country's future.", "She works in higher education."]},
+  {w:"effect",p:"/ɪˈfekt/",m:"effetto",s:["The medicine had an immediate {{effect}}.", "Global warming will have a serious {{effect}}."]},
+  {w:"effort",p:"/ˈefət/",m:"sforzo",s:["Learning a language requires a lot of {{effort}}.", "He put a lot of {{effort}} into the project."]},
+  {w:"encourage",p:"/ɪnˈkʌrɪdʒ/",m:"incoraggiare",s:["Parents should {{encourage}} their children to read.", "The coach always {{encourage}}d the team."]},
+  {w:"energy",p:"/ˈenədʒi/",m:"energia",s:["She has so much {{energy}} in the morning.", "We need to save energy at home."]},
+  {w:"enjoy",p:"/ɪnˈdʒɔɪ/",m:"godere",s:["I really enjoyed the concert last night.", "We hope you enjoy your stay here."]},
+  {w:"enough",p:"/ɪˈnʌf/",m:"abbastanza",s:["Do we have enough time to finish?", "I haven't had enough sleep lately."]},
+  {w:"ensure",p:"/ɪnˈʃʊə/",m:"garantire",s:["Please ensure that all doors are locked.", "This will ensure a better result."]},
+  {w:"entire",p:"/ɪnˈtaɪə/",m:"intero, completo",s:["The entire project took three years.", "She spent the entire day reading."]},
+  {w:"environment",p:"/ɪnˈvaɪrənmənt/",m:"ambiente",s:["We need to protect the natural environment.", "The office is a friendly working environment."]},
+  {w:"escape",p:"/ɪˈskeɪp/",m:"fuggire",s:["They managed to escape from the burning building.", "Reading is a good escape from reality."]},
+  {w:"establish",p:"/ɪˈstæblɪʃ/",m:"stabilire",s:["The company was established in 1990.", "We need to establish a new policy."]},
+  {w:"evidence",p:"/ˈevɪdəns/",m:"prova",s:["There is no evidence that he was involved.", "The police found evidence at the scene."]},
+  {w:"exact",p:"/ɪɡˈzækt/",m:"esatto, preciso",s:["What is the exact time of the meeting?", "The two words have the exact same meaning."]},
+  {w:"examine",p:"/ɪɡˈzæmɪn/",m:"esaminare",s:["The doctor will examine you carefully.", "We need to examine the data more closely."]},
+  {w:"example",p:"/ɪɡˈzɑːmpl/",m:"esempio",s:["Can you give me an example of this grammar rule?", "For example, we could leave at 8 o'clock."]},
+  {w:"excellent",p:"/ˈeksələnt/",m:"eccellente",s:["She did an excellent job on the presentation.", "The food at that restaurant is excellent."]},
+  {w:"exist",p:"/ɪɡˈzɪst/",m:"esistere",s:["Do you think aliens exist?", "The problem doesn't really exist."]},
+  {w:"expect",p:"/ɪkˈspekt/",m:"aspettarsi",s:["I expect to finish the report by Friday.", "Don't expect too much too soon."]},
+  {w:"experience",p:"/ɪkˈspɪriəns/",m:"esperienza",s:["She has a lot of teaching experience.", "Living abroad was an amazing experience."]},
+  {w:"explain",p:"/ɪkˈspleɪn/",m:"spiegare",s:["Can you please explain this rule to me?", "He didn't explain why he was late."]},
+  {w:"explore",p:"/ɪkˈsplɔː/",m:"esplorare",s:["We want to explore the old part of the city.", "The children love to explore the garden."]},
+  {w:"express",p:"/ɪkˈspres/",m:"esprimere",s:["She found it hard to express her feelings.", "Please express your opinion clearly."]},
+  {w:"familiar",p:"/fəˈmɪliə/",m:"familiare",s:["The song sounds very familiar.", "Are you familiar with this software?"]},
+  {w:"famous",p:"/ˈfeɪməs/",m:"famoso",s:["Paris is famous for the Eiffel Tower.", "She became famous after her first film."]},
+  {w:"fear",p:"/fɪə/",m:"paura",s:["She has a fear of flying.", "There is no fear of losing the match."]},
+  {w:"figure",p:"/ˈfɪɡə/",m:"figura, capire",s:["She's a well-known public figure.", "Can you figure out how to solve this?"]},
+  {w:"focus",p:"/ˈfəʊkəs/",m:"concentrarsi",s:["You need to focus on your studies.", "The focus of the lesson is grammar."]},
+  {w:"follow",p:"/ˈfɒləʊ/",m:"seguire",s:["Please follow the instructions carefully.", "She followed him to the station."]},
+  {w:"foreign",p:"/ˈfɒrɪn/",m:"straniero",s:["He works in a foreign company.", "Do you speak any foreign languages?"]},
+  {w:"frequent",p:"/ˈfriːkwənt/",m:"frequente",s:["He is a frequent visitor to this cafe.", "The most frequent problem is the internet connection."]},
+  {w:"generation",p:"/ˌdʒenəˈreɪʃn/",m:"generazione",s:["Younger generations use technology more.", "This is a multi-generation family business."]},
+  {w:"goal",p:"/ɡəʊl/",m:"obiettivo",s:["Our main goal is to improve customer service.", "She scored the winning goal."]},
+  {w:"government",p:"/ˈɡʌvənmənt/",m:"governo",s:["The government introduced a new tax policy.", "People are losing trust in the government."]},
+  {w:"gradual",p:"/ˈɡrædʒuəl/",m:"graduale",s:["There has been a gradual increase in sales.", "Learning takes gradual progress."]},
+  {w:"guess",p:"/ɡes/",m:"indovinare",s:["Can you guess how old she is?", "I guess it will rain later."]},
+  {w:"guide",p:"/ɡaɪd/",m:"guida",s:["Our tour guide spoke excellent English.", "This book is a helpful guide for beginners."]},
+  {w:"harm",p:"/hɑːm/",m:"danno",s:["Pollution can harm the environment.", "He meant no harm by his comment."]},
+  {w:"heart",p:"/hɑːt/",m:"cuore",s:["She has a very kind heart.", "He had a heart attack last year."]},
+  {w:"heavy",p:"/ˈhevi/",m:"pesante",s:["It's going to rain - the sky looks very heavy.", "How heavy is this suitcase?"]},
+  {w:"height",p:"/haɪt/",m:"altezza",s:["What is the height of Mount Everest?", "She is medium height and has dark hair."]},
+  {w:"honest",p:"/ˈɒnɪst/",m:"onesto",s:["I think he is a very honest person.", "To be honest, I don't like this film."]},
+  {w:"imagine",p:"/ɪˈmædʒɪn/",m:"immaginare",s:["Can you imagine life without a smartphone?", "I can't imagine how she managed alone."]},
+  {w:"improve",p:"/ɪmˈpruːv/",m:"migliorare",s:["We need to improve our customer service.", "Her English has improved a great deal."]},
+  {w:"include",p:"/ɪnˈkluːd/",m:"includere",s:["The price does not include tax.", "The package includes free delivery."]},
+  {w:"increase",p:"/ɪnˈkriːs/",m:"aumentare",s:["The city's population continues to increase.", "Exercise can increase your energy levels."]},
+  {w:"influence",p:"/ˈɪnfluəns/",m:"influenza",s:["Social media has a huge influence on young people.", "His father influenced him a lot."]},
+  {w:"manage",p:"/ˈmænɪdʒ/",m:"gestire, riuscire",s:["She manages a team of twenty people.", "How do you manage to stay so calm?"]},
+  {w:"necessary",p:"/ˈnesəsəri/",m:"necessario",s:["It's necessary to wear a seatbelt.", "Is it necessary to book in advance?"]},
+  {w:"opinion",p:"/əˈpɪnjən/",m:"opinione",s:["In my opinion, this is the best option.", "Everyone is entitled to their own opinion."]},
+  {w:"opportunity",p:"/ˌɒpəˈtjuːnəti/",m:"opportunita",s:["This is a great opportunity for you.", "Don't miss this opportunity to grow."]},
+  {w:"participate",p:"/pɑːˈtɪsɪpeɪt/",m:"partecipare",s:["Everyone is welcome to participate.", "She refused to participate in the debate."]},
+  {w:"persuade",p:"/pəˈsweɪd/",m:"convincere",s:["I finally persuaded him to see a doctor.", "Can anyone persuade her to change her mind?"]},
+  {w:"prefer",p:"/prɪˈfɜː/",m:"preferire",s:["I prefer tea to coffee in the morning.", "Which do you prefer, red or blue?"]},
+  {w:"prepare",p:"/prɪˈpeə/",m:"preparare",s:["We need to prepare for bad weather.", "She is preparing hard for her final exam."]},
+  {w:"prevent",p:"/prɪˈvent/",m:"prevenire",s:["This vaccine can prevent serious illness.", "Nothing could prevent them from trying again."]},
+  {w:"private",p:"/ˈpraɪvət/",m:"privato",s:["This is a private conversation.", "She goes to a private school."]},
+  {w:"probably",p:"/ˈprɒbəbli/",m:"probabilmente",s:["It will probably rain tomorrow.", "He probably won't come to the party."]},
+  {w:"promise",p:"/ˈprɒmɪs/",m:"promettere",s:["I promise I will call you tomorrow.", "The forecast promises sunny weather this weekend."]},
+  {w:"protect",p:"/prəˈtekt/",m:"proteggere",s:["We must protect the environment.", "Sunscreen protects your skin from UV rays."]},
+  {w:"provide",p:"/prəˈvaɪd/",m:"fornire",s:["The school will provide lunch for all students.", "Can you provide more details about the plan?"]},
+  {w:"purpose",p:"/ˈpɜːpəs/",m:"scopo",s:["What is the purpose of this meeting?", "She studied medicine with a clear purpose."]},
+  {w:"recognize",p:"/ˈrekəɡnaɪz/",m:"riconoscere",s:["I didn't recognize you with your new haircut!", "The government recognized their contribution."]},
+  {w:"recommend",p:"/ˌrekəˈmend/",m:"raccomandare",s:["Can you recommend a good restaurant nearby?", "I recommend reading this book to everyone."]},
+  {w:"reduce",p:"/rɪˈdjuːs/",m:"ridurre",s:["We need to reduce our daily expenses.", "The company decided to reduce the price."]},
+  {w:"regular",p:"/ˈreɡjʊlə/",m:"regolare",s:["He goes to the gym on a regular basis.", "This is a regular event in our school."]},
+  {w:"require",p:"/rɪˈkwaɪə/",m:"richiedere",s:["The job requires a university degree.", "All visitors are required to sign in."]},
+  {w:"research",p:"/rɪˈsɜːtʃ/",m:"ricerca",s:["She is doing research on climate change.", "The research shows interesting results."]},
+  {w:"responsible",p:"/rɪˈspɒnsɪbl/",m:"responsabile",s:["Who is responsible for this project?", "She is a very responsible person."]},
+  {w:"satisfy",p:"/ˈsætɪsfaɪ/",m:"soddisfare",s:["The results didn't fully satisfy him.", "Nothing seems to satisfy her curiosity."]},
+  {w:"solution",p:"/səˈluːʃn/",m:"soluzione",s:["We need to find a solution to this problem.", "There is no simple solution to this issue."]},
+  {w:"suffer",p:"/ˈsʌfə/",m:"soffrire",s:["Many people suffer from stress at work.", "The town suffered heavy damage in the storm."]},
+  {w:"support",p:"/səˈpɔːt/",m:"supportare",s:["Thank you for supporting me through this.", "The government supports small businesses."]},
+  {w:"survive",p:"/səˈvaɪv/",m:"sopravvivere",s:["He survived the accident without serious injury.", "It's difficult to survive alone in the wild."]},
+  {w:"suggest",p:"/səˈdʒest/",m:"suggerire",s:["I suggest we take a different route today.", "She suggested meeting at the coffee shop."]},
+  {w:"value",p:"/ˈvæljuː/",m:"valore",s:["This painting has great historical value.", "I really value our friendship."]},
+  {w:"volunteer",p:"/ˌvɒlənˈtɪə/",m:"volontario",s:["She works as a volunteer at the hospital.", "We need volunteers for the charity event."]},
+  {w:"wonder",p:"/ˈwʌndə/",m:"chiedersi",s:["I wonder what time the train leaves.", "She wondered if he would come to the party."]}
 ];
-
-// ============ Data Model ============
-// Word: { id, word, phonetic, meaning, sentences:[], level, interval, ease, reps, nextReview }
-
-function mkWordEntry(w, p, m, sentences) {
-  return {
-    id: Date.now() * 1000 + Math.floor(Math.random()*1000),
-    word: w.toLowerCase(),
-    phonetic: p || '',
-    meaning: m,
-    sentences: sentences || [],
-    level: 0, interval: 0, ease: 2.5, reps: 0,
-    nextReview: todayStr(), lastReview: null,
-  };
-}
-
-function loadWords() {
-  const saved = localStorage.getItem('vl_words');
-  if (saved) return JSON.parse(saved);
-  return BUILTIN.map(b => mkWordEntry(b.w, b.p, b.m, b.s));
-}
-
-function saveWords() { localStorage.setItem('vl_words', JSON.stringify(words)); }
-function todayStr() { return new Date().toISOString().split('T')[0]; }
-
-// ============ SRS ============
-function schedule(w, rem) {
-  if (rem) {
-    w.reps += 1;
-    if (w.reps === 1) w.interval = 1;
-    else if (w.reps === 2) w.interval = 3;
-    else w.interval = Math.round(w.interval * w.ease);
-    w.ease = Math.max(1.3, w.ease + 0.1);
-    w.level = Math.min(2, w.level + 1);
-  } else {
-    w.reps = 0; w.interval = 0;
-    w.ease = Math.max(1.3, w.ease - 0.2);
-    w.level = 0;
-  }
-  const d = new Date(); d.setDate(d.getDate() + w.interval);
-  w.nextReview = d.toISOString().split('T')[0];
-  w.lastReview = todayStr();
-  return w;
-}
-
-// ============ State ============
-let words = loadWords();
-let queue = [];
-let qi = 0;       // queue index
-let sentIdx = 0;  // sentence index within current word
-let doneToday = 0;
-let showingAnswer = false;
-
-function getDue() { return words.filter(w => w.nextReview <= todayStr()); }
-
-// ============ Render ============
-function updateStats() {
-  const due = getDue();
-  document.getElementById('statTotal').textContent = words.length;
-  document.getElementById('statDue').textContent = due.length;
-  document.getElementById('statDone').textContent = doneToday;
-  const badge = document.getElementById('reviewBadge');
-  if (due.length > 0) { badge.style.display = 'flex'; badge.textContent = due.length; }
-  else { badge.style.display = 'none'; }
-  updateStreak();
-}
-
-function updateStreak() {
-  let s = 0, d = new Date();
-  for (let i = 0; i < 400; i++) {
-    const ds = new Date(d); ds.setDate(ds.getDate() - i);
-    const key = 'vl_log_' + ds.toISOString().split('T')[0];
-    if (JSON.parse(localStorage.getItem(key)||'[]').length > 0) s++;
-    else if (i > 0) break;
-  }
-  document.getElementById('streakBadge').textContent = '🔥 ' + s + '天';
-}
-
-function renderCard() {
-  queue = getDue(); qi = 0; sentIdx = 0; showingAnswer = false;
-  document.getElementById('judgeRow').style.display = 'none';
-  document.getElementById('completeArea').innerHTML = '';
-
-  if (queue.length === 0) {
-    document.getElementById('cardArea').innerHTML = '';
-    document.getElementById('completeArea').innerHTML = `
-      <div class="complete fade-up">
-        <div class="em">🎉</div>
-        <h2>今天搞定啦！</h2>
-        <p>已完成 ${doneToday} 个单词的复习</p>
-        <button class="btn-rst" onclick="reviewAll()">🔄 复习全部词库</button>
-      </div>`;
-    updateProg();
-    return;
-  }
-  renderCurrentCard();
-}
-
-function renderCurrentCard() {
-  if (qi >= queue.length) { renderCard(); return; }
-  const w = queue[qi];
-  const totalS = w.sentences.length || 1;
-  const area = document.getElementById('cardArea');
-
-  if (!showingAnswer) {
-    const blanked = blankSentence(w.sentences[sentIdx] || '', w.word);
-    const dots = [];
-    for (let i = 0; i < totalS; i++) {
-      const cls = i < sentIdx ? 'active done' : i === sentIdx ? 'active' : '';
-      dots.push(`<div class="s-dot ${cls}"></div>`);
-    }
-    area.innerHTML = `
-      <div class="card fade-up" onclick="flipOrNext()">
-        <div class="card-deco">?</div>
-        <div class="hint-label">🧩 根据提示猜单词</div>
-        <div class="sentence">${blanked}</div>
-        <div class="hint-box">
-          <div class="hl">中文提示</div>
-          <div class="hm">${escH(w.meaning)}</div>
-        </div>
-        ${totalS > 1 ? `<div class="sentence-nav">${dots.join('')}<span class="s-label">${sentIdx+1}/${totalS} 例句</span></div>` : ''}
-        <div class="tap-hint">👆 点击查看答案</div>
-      </div>`;
-  } else {
-    const filled = fillSentence(w.sentences[sentIdx] || '', w.word);
-    const dots = [];
-    for (let i = 0; i < totalS; i++) {
-      const cls = i <= sentIdx ? 'active done' : '';
-      dots.push(`<div class="s-dot ${cls}"></div>`);
-    }
-    area.innerHTML = `
-      <div class="card fade-up">
-        <button class="speak-btn" onclick="event.stopPropagation();speak('${escS(w.word)}')">🔊</button>
-        <div class="aw">${escH(w.word)}</div>
-        ${w.phonetic ? '<div class="aph">'+escH(w.phonetic)+'</div>' : ''}
-        <div class="asent">${filled}</div>
-        ${sentIdx+1 < totalS ? `<button onclick="nextSentence()" style="width:100%;padding:10px;background:var(--purple-dim);color:var(--purple);border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:8px;">看下一个例句 →</button>` : ''}
-        ${totalS > 1 ? `<div class="sentence-nav">${dots.join('')}<span class="s-label">${sentIdx+1}/${totalS} 例句</span></div>` : ''}
-        <div class="amean">📖 ${escH(w.meaning)}</div>
-      </div>`;
-  }
-  updateProg();
-}
-
-function flipOrNext() {
-  if (showingAnswer) {
-    // Already showing answer → go to next sentence or show judge
-    const w = queue[qi];
-    if (sentIdx + 1 < (w.sentences.length || 1)) {
-      sentIdx++;
-      renderCurrentCard();
-    }
-  } else {
-    showingAnswer = true;
-    renderCurrentCard();
-    document.getElementById('judgeRow').style.display = 'flex';
-  }
-}
-
-function nextSentence() {
-  const w = queue[qi];
-  if (sentIdx + 1 < (w.sentences.length || 0)) {
-    sentIdx++;
-    renderCurrentCard();
-  }
-}
-
-function blankSentence(sent, word) {
-  return sent.replace(/\{\{(\w+)\}\}/gi, '<span class="blank">________</span>');
-}
-
-function fillSentence(sent, word) {
-  return sent.replace(/\{\{(\w+)\}\}/gi, '<span class="filled">$1</span>');
-}
-
-function updateProg() {
-  const total = Math.max(queue.length, 1);
-  const pct = Math.round(qi / total * 100);
-  document.getElementById('progFill').style.width = pct + '%';
-  document.getElementById('progFrac').textContent = `${Math.min(qi,total)}/${total}`;
-}
-
-function judge(rem) {
-  const w = queue[qi];
-  const wi = words.findIndex(x => x.id === w.id);
-  if (wi === -1) return;
-  words[wi] = schedule(words[wi], rem);
-  saveWords();
-  doneToday++;
-  logToday(w.id);
-  updateStats();
-
-  const area = document.getElementById('cardArea');
-  const card = area.querySelector('.card');
-  if (card) {
-    card.classList.add(rem ? 'slide-out-l' : 'slide-out-r');
-    setTimeout(() => {
-      qi++; sentIdx = 0; showingAnswer = false;
-      if (qi >= queue.length) { renderCard(); }
-      else {
-        document.getElementById('judgeRow').style.display = 'none';
-        renderCurrentCard();
-      }
-    }, 180);
-  }
-}
-
-function logToday(id) {
-  const ds = todayStr();
-  const log = JSON.parse(localStorage.getItem('vl_log_' + ds) || '[]');
-  log.push({ id });
-  localStorage.setItem('vl_log_' + ds, JSON.stringify(log));
-}
-
-function reviewAll() {
-  words.forEach(w => w.nextReview = todayStr());
-  saveWords(); updateStats(); renderCard();
-}
-
-// ============ Pages ============
-function goPage(name, btn) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-  document.getElementById('page' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
-  if (btn) btn.classList.add('active');
-  if (name === 'card') renderCard();
-  if (name === 'list') renderList();
-  if (name === 'review') renderReview();
-}
-
-// ============ List ============
-function renderList() {
-  const area = document.getElementById('listArea');
-  if (words.length === 0) {
-    area.innerHTML = '<div class="empty"><div class="ic">📭</div>还没有单词，快去添加吧</div>';
-    return;
-  }
-  let h = '';
-  words.forEach(w => {
-    const lv = ['<span class="wl-lv lv-0">新词</span>','<span class="wl-lv lv-1">学习中</span>','<span class="wl-lv lv-2">已掌握</span>'][w.level];
-    h += `<div class="wl-item fade-up"><div class="wl-l"><span class="wl-w">${escH(w.word)}</span>${w.phonetic?`<span class="wl-p">${escH(w.phonetic)}</span>`:''}<div class="wl-m">${escH(w.meaning)}</div></div><div class="wl-r">${lv}<button class="wl-del" onclick="delWord(${w.id})">✕</button></div></div>`;
-  });
-  area.innerHTML = h;
-}
-
-function delWord(id) {
-  if (!confirm('确定删除？')) return;
-  words = words.filter(w => w.id !== id);
-  saveWords(); updateStats(); renderList();
-}
-
-// ============ Add Modal ============
-function showAdd() {
-  document.getElementById('addModal').classList.add('show');
-  document.getElementById('inpWord').focus();
-}
-function hideAdd() {
-  document.getElementById('addModal').classList.remove('show');
-  ['inpWord','inpPhonetic','inpMeaning','inpSent1','inpSent2'].forEach(id => document.getElementById(id).value = '');
-}
-function submitAdd() {
-  const w = document.getElementById('inpWord').value.trim().toLowerCase();
-  const p = document.getElementById('inpPhonetic').value.trim();
-  const m = document.getElementById('inpMeaning').value.trim();
-  const s1 = document.getElementById('inpSent1').value.trim();
-  const s2 = document.getElementById('inpSent2').value.trim();
-  if (!w || !m || !s1) { alert('请至少填写单词、释义和例句1'); return; }
-  // Auto-wrap word in sentence if not wrapped
-  const fix = s => s.replace(new RegExp('\\b'+escapeRegex(w)+'\\b','i'), '{{'+w+'}}');
-  const sentArr = [];
-  [s1,s2].forEach(s => { if(s) sentArr.push(fix(s)); });
-  words.push(mkWordEntry(w, p, m, sentArr));
-  saveWords(); updateStats(); hideAdd(); renderList();
-  goPage('list', document.querySelectorAll('.nav-item')[2]);
-}
-
-// ============ Import Modal ============
-function showImport() {
-  document.getElementById('importModal').classList.add('show');
-  document.getElementById('importArea').focus();
-  document.getElementById('importMsg').className = 'import-msg';
-  document.getElementById('importArea').value = '';
-}
-function hideImport() {
-  document.getElementById('importModal').classList.remove('show');
-}
-
-function doImport() {
-  const raw = document.getElementById('importArea').value.trim();
-  const msg = document.getElementById('importMsg');
-  if (!raw) { msg.className = 'import-msg err'; msg.textContent = '请粘贴单词数据'; return; }
-
-  const lines = raw.split('\n').map(l => l.trim()).filter(l => l);
-  let count = 0, errs = [];
-
-  lines.forEach((line, li) => {
-    // Try pipe format: word | meaning | sent1 | sent2
-    const parts = line.split('|').map(p => p.trim()).filter(p => p);
-    if (parts.length < 3) { errs.push(`第${li+1}行格式不正确`); return; }
-    const w = parts[0].toLowerCase();
-    const m = parts[1];
-    const sentences = [];
-    for (let i = 2; i < parts.length; i++) {
-      let s = parts[i];
-      // Auto-wrap if not wrapped
-      if (s && !s.includes('{{')) {
-        s = s.replace(new RegExp('\\b'+escapeRegex(w)+'\\b','i'), '{{'+w+'}}');
-      }
-      if (s) sentences.push(s);
-    }
-    if (!w || !m || sentences.length === 0) { errs.push(`第${li+1}行缺少必要信息`); return; }
-    words.push(mkWordEntry(w, '', m, sentences));
-    count++;
-  });
-
-  saveWords(); updateStats();
-  if (errs.length > 0) {
-    msg.className = 'import-msg err';
-    msg.textContent = `成功导入 ${count} 个，失败 ${errs.length} 个。示例错误：${errs.slice(0,2).join('；')}`;
-  } else {
-    msg.className = 'import-msg ok';
-    msg.textContent = `✅ 成功导入 ${count} 个单词！`;
-    setTimeout(() => { hideImport(); renderList(); goPage('list', document.querySelectorAll('.nav-item')[2]); }, 800);
-  }
-}
-
-// ============ Review Page ============
-function renderReview() {
-  document.getElementById('reviewNum').textContent = getDue().length;
-  renderCal();
-}
-function renderCal() {
-  const area = document.getElementById('calArea');
-  const dns = ['日','一','二','三','四','五','六'];
-  let h = '<div style="font-size:13px;font-weight:600;margin-bottom:10px;">📅 学习记录</div>';
-  h += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center;">';
-  dns.forEach(d => h += `<div style="font-size:10px;color:var(--text-dim);padding:3px;">${d}</div>`);
-  const today = new Date();
-  for (let i = 27; i >= 0; i--) {
-    const d = new Date(today); d.setDate(d.getDate() - i);
-    const ds = d.toISOString().split('T')[0];
-    const log = JSON.parse(localStorage.getItem('vl_log_' + ds) || '[]');
-    const isToday = ds === todayStr();
-    const cls = log.length > 0 ? 'background:var(--green-dim);color:var(--green);font-weight:700;' : '';
-    const tCls = isToday ? 'border:1px solid var(--purple);' : '';
-    h += `<div style="aspect-ratio:1;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;${cls}${tCls}">${d.getDate()}</div>`;
-  }
-  h += '</div>';
-  area.innerHTML = h;
-}
-function startReview() { goPage('card', document.querySelectorAll('.nav-item')[0]); }
-
-// ============ TTS ============
-function speak(text) {
-  if (!('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = 'en-US'; u.rate = 0.82;
-  window.speechSynthesis.speak(u);
-}
-
-// ============ Utils ============
-function escS(s) { return s.replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
-function escR(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
-function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
-function escH(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-// ============ Keyboard ============
-document.addEventListener('keydown', e => {
-  if (document.getElementById('addModal').classList.contains('show')) {
-    if (e.key === 'Escape') hideAdd();
-    if (e.key === 'Enter' && e.ctrlKey) submitAdd();
-    return;
-  }
-  if (document.getElementById('importModal').classList.contains('show')) {
-    if (e.key === 'Escape') hideImport();
-    return;
-  }
-  if (e.key === ' ' || e.key === 'Enter') {
-    e.preventDefault();
-    if (!showingAnswer) flipOrNext();
-  }
-  if (e.key === 'ArrowLeft' || e.key === 'a') { e.preventDefault(); judge(false); }
-  if (e.key === 'ArrowRight' || e.key === 'd') { e.preventDefault(); judge(true); }
-  if (e.key === 'n' && showingAnswer) nextSentence();
-});
-
-// ============ Init ============
-updateStats();
-renderCard();
+function mkW(w,p,m,s){return{id:Date.now()*1000+Math.floor(Math.random()*1000),word:w.toLowerCase(),phonetic:p||"",meaning:m,sentences:s||[],level:0,interval:0,ease:2.5,reps:0,nextReview:today(),lastReview:null}}
+function today(){return new Date().toISOString().split("T")[0]}
+function loadWords(){var s=localStorage.getItem("vl_words");if(s)return JSON.parse(s);return BUILTIN.map(function(b){return mkW(b.w,b.p,b.m,b.s)})}
+function saveWords(){localStorage.setItem("vl_words",JSON.stringify(words))}
+var words=loadWords(),queue=[],qi=0,sentIdx=0,doneToday=0,showingAnswer=false;
+function getDue(){return words.filter(function(w){return w.nextReview<=today()})}
+function srs(w,rem){if(rem){w.reps+=1;if(w.reps===1)w.interval=1;else if(w.reps===2)w.interval=3;else w.interval=Math.round(w.interval*w.ease);w.ease=Math.max(1.3,w.ease+0.1);w.level=Math.min(2,w.level+1)}else{w.reps=0;w.interval=0;ease=Math.max(1.3,w.ease-0.2);w.level=0}var d=new Date();d.setDate(d.getDate()+w.interval);w.nextReview=d.toISOString().split("T")[0];w.lastReview=today();return w}
+function escH(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
+function escJ(s){return s.replace(/\\/g,"\\\\").replace(/'/g,"\\'")}
+function escRe(s){return s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")}
+function updateStats(){var due=getDue();document.getElementById("statTotal").textContent=words.length;document.getElementById("statDue").textContent=due.length;document.getElementById("statDone").textContent=doneToday;var b=document.getElementById("reviewBadge");if(due.length>0){b.style.display="flex";b.textContent=due.length}else{b.style.display="none"}updateStreak()}
+function updateStreak(){var s=0,base=new Date();for(var i=0;i<365;i++){var d=new Date(base);d.setDate(d.getDate()-i);var ds=d.toISOString().split("T")[0];var log=JSON.parse(localStorage.getItem("vl_log_"+ds)||"[]");if(log.length>0)s++;else if(i>0)break}document.getElementById("streakBadge").textContent="\uD83D\uDD25 "+s+"\u5929"}
+function renderCard(){queue=getDue();qi=0;sentIdx=0;showingAnswer=false;document.getElementById("judgeRow").style.display="none";document.getElementById("completeArea").innerHTML="";if(queue.length===0){document.getElementById("cardArea").innerHTML="";document.getElementById("completeArea").innerHTML='<div class="complete fade-up"><div class="em">\uD83C\uDF89</div><h2>\u4ECA\u5929\u641E\u5B9A\u554A\uFF01</h2><p>\u5DF2\u5B8C\u6210 '+doneToday+' \u4E2A\u5355\u8BCD</p><button class="btn-rst" onclick="reviewAll()">\uD83D\uDD04 \u590D\u4E60\u5168\u90E8\u8BCD\u5E93</button></div>';updateProg();return}renderCur()}
+function renderCur(){if(qi>=queue.length){renderCard();return}var w=queue[qi],ts=w.sentences.length||1,area=document.getElementById("cardArea");if(!showingAnswer){var blanked=w.sentences[sentIdx]?w.sentences[sentIdx].replace(/\{\{(\w+)\}\}/gi,"<span class=\"blank\">________</span>"):"";var dots="";for(var i=0;i<ts;i++){dots+='<div class="s-dot'+(i===sentIdx?" act":"")+'"></div>'}area.innerHTML='<div class="card fade-up" onclick="flipCard()"><div class="card-deco">?</div><div class="hint-label">\uD83E\uDDE9 \u6839\u636E\u63D0\u793A\u731C\u5355\u8BCD</div><div class="sentence">'+blanked+'</div><div class="hint-box"><div class="hl">\u610F\u5927\u5229\u8BED\u63D0\u793A</div><div class="hm">'+escH(w.meaning)+'</div></div>'+(ts>1?'<div class="sent-nav">'+dots+'<span class="s-nav-label">'+(sentIdx+1)+'/'+ts+' \u4F8B\u53E5</span></div>':'')+'<div class="tap-hint">\uD83D\uDC46 \u70B9\u51FB\u67E5\u770B\u7B54\u6848</div></div>'}else{var filled=w.sentences[sentIdx]?w.sentences[sentIdx].replace(/\{\{(\w+)\}\}/gi,"<span class=\"filled\">$1</span>"):"";var dots2="";for(var j=0;j<ts;j++){dots2+='<div class="s-dot'+(j<=sentIdx?" act":"")+'"></div>'}var nexBtn=sentIdx+1<ts?'<button class="btn-next-sent" onclick="nextSent()">\u770B\u4E0B\u4E00\u4E2A\u4F8B\u53E5 \u2192</button>':"";area.innerHTML='<div class="card fade-up"><button class="speak-btn" onclick="event.stopPropagation();speak(\''+escJ(w.word)+'\')">\uD83D\uDD0A</button><div class="aw">'+escH(w.word)+'</div>'+(w.phonetic?'<div class="aph">'+escH(w.phonetic)+'</div>':'')+'<div class="asent">'+filled+'</div>'+nexBtn+(ts>1?'<div class="sent-nav">'+dots2+'<span class="s-nav-label">'+(sentIdx+1)+'/'+ts+' \u4F8B\u53E5</span></div>':'')+'<div class="amean">\uD83D\uDCD6 '+escH(w.meaning)+'</div></div>'}updateProg()}
+function flipCard(){if(!showingAnswer){showingAnswer=true;renderCur();document.getElementById("judgeRow").style.display="flex"}}
+function nextSent(){var w=queue[qi];if(sentIdx+1<(w.sentences.length||0)){sentIdx++;renderCur()}}
+function updateProg(){var total=Math.max(queue.length,1),pct=Math.round(qi/total*100);document.getElementById("progFill").style.width=pct+"%";document.getElementById("progFrac").textContent=Math.min(qi+1,total)+"/"+total}
+function judge(rem){var w=queue[qi],wi=words.findIndex(function(x){return x.id===w.id});if(wi===-1)return;words[wi]=srs(words[wi],rem);saveWords();doneToday++;logToday(w.id);updateStats();var card=document.querySelector(".card");if(card){card.classList.add(rem?"slide-out-l":"slide-out-r");setTimeout(function(){qi++;sentIdx=0;showingAnswer=false;document.getElementById("judgeRow").style.display="none";if(qi>=queue.length)renderCard();else renderCur()},180)}}
+function logToday(id){var ds=today();var log=JSON.parse(localStorage.getItem("vl_log_"+ds)||"[]");log.push({id:id});localStorage.setItem("vl_log_"+ds,JSON.stringify(log))}
+function reviewAll(){words.forEach(function(w){w.nextReview=today()});saveWords();updateStats();renderCard()}
+function goPage(name,btn){document.querySelectorAll(".page").forEach(function(p){p.classList.remove("active")});document.querySelectorAll(".nav-item").forEach(function(b){b.classList.remove("active")});document.getElementById("page"+name.charAt(0).toUpperCase()+name.slice(1)).classList.add("active");if(btn)btn.classList.add("active");if(name==="card")renderCard();if(name==="list")renderList();if(name==="review")renderReview()}
+function renderList(){var area=document.getElementById("listArea");if(words.length===0){area.innerHTML='<div class="empty"><div class="ic">\uD83D\uDCED</div>还没有单词，快去添加吧</div>';return}var h="";words.forEach(function(w){var lv=["<span class=\"wl-lv lv-0\">新词</span>","<span class=\"wl-lv lv-1\">学习中</span>","<span class=\"wl-lv lv-2\">已掌握</span>"][w.level];h+='<div class="wl-item fade-up"><div><span class="wl-word">'+escH(w.word)+'</span>'+(w.phonetic?'<span class="wl-ph">'+escH(w.phonetic)+'</span>':'')+'<div class="wl-mean">'+escH(w.meaning)+'</div></div><div class="wl-right">'+lv+'<button class="wl-del" onclick="delWord('+w.id+')">✕</button></div></div>'});area.innerHTML=h}
+function delWord(id){if(!confirm("确定删除？"))return;words=words.filter(function(w){return w.id!==id});saveWords();updateStats();renderList()}
+function showAdd(){document.getElementById("addModal").classList.add("show");document.getElementById("inpWord").focus()}
+function hideAdd(){document.getElementById("addModal").classList.remove("show");["inpWord","inpPhonetic","inpMeaning","inpSent1","inpSent2"].forEach(function(id){document.getElementById(id).value=""})}
+function submitAdd(){var w=document.getElementById("inpWord").value.trim().toLowerCase();var p=document.getElementById("inpPhonetic").value.trim();var m=document.getElementById("inpMeaning").value.trim();var s1=document.getElementById("inpSent1").value.trim();var s2=document.getElementById("inpSent2").value.trim();if(!w||!m||!s1){alert("请至少填写单词、释义和例句");return}function fix(s){if(s&&!s.includes("{{"))s=s.replace(new RegExp("\\b"+escRe(w)+"\\b","i"),"{{"+w+"}}");return s}var sa=[];if(s1)sa.push(fix(s1));if(s2)sa.push(fix(s2));words.push(mkW(w,p,m,sa));saveWords();updateStats();hideAdd();renderList();goPage("list",document.querySelectorAll(".nav-item")[2])}
+function showImport(){document.getElementById("importModal").classList.add("show");document.getElementById("importArea").focus();document.getElementById("importMsg").className="import-msg";document.getElementById("importArea").value=""}
+function hideImport(){document.getElementById("importModal").classList.remove("show")}
+function doImport(){var raw=document.getElementById("importArea").value.trim();var msg=document.getElementById("importMsg");if(!raw){msg.className="import-msg err";msg.textContent="请粘贴单词数据";return}var lines=raw.split("\n").map(function(l){return l.trim()}).filter(function(l){return l});var count=0,errs=[];lines.forEach(function(line,li){var parts=line.split("|").map(function(p){return p.trim()}).filter(function(p){return p});if(parts.length<3){errs.push("第"+(li+1)+"行格式不正确");return}var w=parts[0].toLowerCase(),m=parts[1],sa=[];for(var i=2;i<parts.length;i++){var s=parts[i];if(s&&!s.includes("{{"))s=s.replace(new RegExp("\\b"+escRe(w)+"\\b","i"),"{{"+w+"}}");if(s)sa.push(s)}if(!w||!m||sa.length===0){errs.push("第"+(li+1)+"行缺少必要信息");return}words.push(mkW(w,"",m,sa));count++});saveWords();updateStats();if(errs.length>0){msg.className="import-msg err";msg.textContent="成功导入 "+count+" 个，失败 "+errs.length+" 个。"+(errs[0]||"")}else{msg.className="import-msg ok";msg.textContent="✅ 成功导入 "+count+" 个单词！";setTimeout(function(){hideImport();renderList();goPage("list",document.querySelectorAll(".nav-item")[2])},800)}}
+function renderReview(){document.getElementById("reviewNum").textContent=getDue().length;renderCal()}
+function renderCal(){var area=document.getElementById("calArea"),dns=["日","一","二","三","四","五","六"],base=new Date();var h='<div class="cal-title">📅 学习记录</div><div class="cal-grid">';dns.forEach(function(d){h+='<div class="cal-hdr">'+d+'</div>'});for(var i=27;i>=0;i--){var d=new Date(base);d.setDate(d.getDate()-i);var ds=d.toISOString().split("T")[0];var log=JSON.parse(localStorage.getItem("vl_log_"+ds)||"[]");var cls="cal-day"+(log.length>0?" done":"")+(ds===today()?" today":"");h+='<div class="'+cls+'">'+d.getDate()+'</div>'}h+="</div>";area.innerHTML=h}
+function startReview(){goPage("card",document.querySelectorAll(".nav-item")[0])}
+function speak(text){if(!("speechSynthesis"in window))return;window.speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(text);u.lang="en-US";u.rate=0.82;window.speechSynthesis.speak(u)}
+document.addEventListener("keydown",function(e){if(document.getElementById("addModal").classList.contains("show")){if(e.key==="Escape")hideAdd();if(e.key==="Enter"&&e.ctrlKey)submitAdd();return}if(document.getElementById("importModal").classList.contains("show")){if(e.key==="Escape")hideImport();return}if(e.key===" "||e.key==="Enter"){e.preventDefault();if(!showingAnswer)flipCard()}if(e.key==="ArrowLeft"||e.key==="a"){e.preventDefault();judge(false)}if(e.key==="ArrowRight"||e.key==="d"){e.preventDefault();judge(true)}if(e.key==="n"&&showingAnswer)nextSent()});
+updateStats();renderCard();
 </script>
 </body>
 </html>
