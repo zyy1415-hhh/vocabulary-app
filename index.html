@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>VocabLift</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <div class="topbar"><div class="logo"><b>V</b>ocabLift</div><span class="streak" id="streakBadge">🔥 0天</span></div>
+  <div class="stats">
+    <div class="stat s-total"><div class="v" id="statTotal">0</div><div class="l">词库</div></div>
+    <div class="stat s-due"><div class="v" id="statDue">0</div><div class="l">待复习</div></div>
+    <div class="stat s-done"><div class="v" id="statDone">0</div><div class="l">今日完成</div></div>
+  </div>
+  <div class="page active" id="pageCard">
+    <div class="prog"><div class="prog-top"><span>进度</span><span id="progFrac">0/0</span></div><div class="prog-track"><div class="prog-fill" id="progFill" style="width:0"></div></div></div>
+    <div id="cardArea"></div>
+    <div class="judge-row" id="judgeRow" style="display:none">
+      <button class="judge-btn btn-hard" onclick="judge(false)">😅 没想起来</button>
+      <button class="judge-btn btn-good" onclick="judge(true)">😎 记住了</button>
+    </div>
+    <div id="completeArea"></div>
+  </div>
+  <div class="page" id="pageReview">
+    <div class="review-hero">
+      <div class="rn" id="reviewNum">0</div>
+      <div class="rt">个单词今天需要复习</div>
+      <button class="btn-start" onclick="startReview()">开始复习 ✏️</button>
+    </div>
+    <div class="cal-card" id="calArea"></div>
+  </div>
+  <div class="page" id="pageList">
+    <div class="phdr"><h2>我的词库</h2><div class="phdr-btns">
+      <button class="btn-add btn-secondary" onclick="showImport()">📥 导入</button>
+      <button class="btn-add btn-primary" onclick="showAdd()">＋ 添加</button>
+    </div></div>
+    <div id="listArea"></div>
+  </div>
+</div>
+<nav class="bottom-nav">
+  <button class="nav-item active" onclick="goPage('card',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="M8 10h8M8 14h5"/></svg>背单词</button>
+  <button class="nav-item" onclick="goPage('review',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>复习<span class="nav-badge" id="reviewBadge" style="display:none">0</span></button>
+  <button class="nav-item" onclick="goPage('list',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>词库</button>
+</nav>
+<div class="modal-ov" id="addModal"><div class="modal">
+  <h3>添加新单词</h3>
+  <label>英文单词</label><input type="text" id="inpWord" placeholder="achieve">
+  <label>音标（可选）</label><input type="text" id="inpPhonetic" placeholder="/əˈtʃiːv/">
+  <label>意大利语释义</label><input type="text" id="inpMeaning" placeholder="raggiungere, realizzare">
+  <label>例句1（用{{}}包住目标单词）</label><textarea id="inpSent1" placeholder="She finally {{achieve}}d her dream."></textarea>
+  <label>例句2（可选）</label><textarea id="inpSent2" placeholder="The team {{achieve}}d excellent results."></textarea>
+  <div class="modal-btns"><button class="mb-cancel" onclick="hideAdd()">取消</button><button class="mb-submit" onclick="submitAdd()">添加</button></div>
+</div></div>
+<div class="modal-ov" id="importModal"><div class="modal">
+  <h3>批量导入单词</h3>
+  <label>粘贴单词数据</label>
+  <textarea class="import-area" id="importArea" placeholder="粘贴到这里..."></textarea>
+  <div class="import-fmt">
+    <b>格式（每行一个单词）：</b><br>
+    <code>单词 | 意大利语释义 | 例句1 | 例句2（可选）</code><br><br>
+    示例：<br>
+    <code>improve | migliorare | We need to {{improve}} our service. | Her English has improved a lot.</code><br><br>
+    如果例句中没有{{}}，系统会自动识别并包裹目标单词。
+  </div>
+  <div class="import-msg" id="importMsg"></div>
+  <div class="modal-btns"><button class="mb-cancel" onclick="hideImport()">取消</button><button class="mb-submit" onclick="doImport()">导入</button></div>
+</div></div>
+<script src="words.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
