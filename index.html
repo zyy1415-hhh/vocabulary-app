@@ -15,6 +15,13 @@
     <div class="stat s-done"><div class="v" id="statDone">0</div><div class="l">今日完成</div></div>
   </div>
   <div class="page active" id="pageCard">
+    <div class="mode-toggle">
+      <span class="mode-label" id="modeLabel">点选模式</span>
+      <button class="toggle-btn" id="toggleBtn" onclick="switchMode()">
+        <span class="toggle-thumb"></span>
+      </button>
+      <span class="mode-label">打字模式</span>
+    </div>
     <div class="prog"><div class="prog-top"><span>进度</span><span id="progFrac">0/0</span></div><div class="prog-track"><div class="prog-fill" id="progFill" style="width:0"></div></div></div>
     <div id="cardArea"></div>
     <div class="judge-row" id="judgeRow" style="display:none">
