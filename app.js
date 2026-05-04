@@ -1,8 +1,13 @@
-// ===== Supabase 初始化 =====
-const SUPABASE_URL = "https://zqucjgajbvanfsosyhfv.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxdWNqZ2FqYnZhbmZzb3N5aGZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4MTM4MzcsImV4cCI6MjA5MzM4OTgzN30.WjsYkqm4BypEnfH5RqeloGO4X1y_dmVy8GAoUGPlXPg";
-
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// ===== Supabase 初始化（可选，失败不影响本地运行）=====
+let supabase = null;
+try {
+  if (window.supabase) {
+    supabase = window.supabase.createClient(
+      "https://zqucjgajbvanfsosyhfv.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxdWNqZ2FqYnZhbmZzb3N5aGZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4MTM4MzcsImV4cCI6MjA5MzM4OTgzN30.WjsYkqm4BypEnfH5RqeloGO4X1y_dmVy8GAoUGPlXPg"
+    );
+  }
+} catch(e) { supabase = null; }
 
 // ===== 全局状态 =====
 let words = [];
@@ -61,37 +66,37 @@ async function loadWords() {
 }
 
 async function saveWord(word) {
-  const { data, error } = await supabase
-    .from('words')
-    .insert([{ ...word, device_id: currentDeviceId }])
-    .select();
-
-  if (error) {
-    console.error('保存单词失败:', error);
-    return null;
+  // 先写本地
+  words.push(word);
+  saveWordsToStorage();
+  // 尝试同步到 Supabase
+  if (supabase) {
+    try {
+      const { data } = await supabase.from('words').insert([{ ...word, device_id: currentDeviceId }]).select();
+      if (data && data[0]) {
+        word.id = data[0].id;
+        saveWordsToStorage();
+      }
+    } catch(e) {}
   }
-  return data[0];
+  return word;
 }
 
 async function updateWord(id, updates) {
-  const { error } = await supabase
-    .from('words')
-    .update(updates)
-    .eq('id', id);
-
-  if (error) {
-    console.error('更新单词失败:', error);
+  // 更新本地
+  const idx = words.findIndex(w => w.id === id);
+  if (idx !== -1) { Object.assign(words[idx], updates); saveWordsToStorage(); }
+  // 同步到 Supabase
+  if (supabase) {
+    try { await supabase.from('words').update(updates).eq('id', id); } catch(e) {}
   }
 }
 
 async function deleteWord(id) {
-  const { error } = await supabase
-    .from('words')
-    .delete()
-    .eq('id', id);
-
-  if (error) {
-    console.error('删除单词失败:', error);
+  words = words.filter(w => w.id !== id);
+  saveWordsToStorage();
+  if (supabase) {
+    try { await supabase.from('words').delete().eq('id', id); } catch(e) {}
   }
 }
 
@@ -246,21 +251,54 @@ const BUILTIN = [
   {w:"wonder",p:"/ˈwʌndə/",m:"chiedersi",s:["I wonder what time the train leaves.", "She wondered if he would come to the party."]}
 ];
 
-// ===== 初始化：从 Supabase 加载数据 =====
-async function initApp() {
-  // 从 Supabase 加载单词
-  words = await loadWords();
+// ===== 本地存储读写 =====
+function loadWordsFromStorage() {
+  try { return JSON.parse(localStorage.getItem('vl_words') || '[]'); }
+  catch(e) { return []; }
+}
+function saveWordsToStorage() {
+  try { localStorage.setItem('vl_words', JSON.stringify(words)); }
+  catch(e) {}
+}
 
-  // 如果 Supabase 中没有数据，插入内置单词
+// ===== 初始化：优先本地，可选云端同步 =====
+async function initApp() {
+  // 优先从 localStorage 加载
+  words = loadWordsFromStorage();
+
+  // 本地无数据，初始化内置单词
   if (words.length === 0) {
     for (const b of BUILTIN) {
       const w = mkW(b.w, b.p, b.m, b.s);
-      const saved = await saveWord(w);
-      if (saved) words.push(saved);
+      words.push(w);
+    }
+    saveWordsToStorage();
+    // 尝试同步到 Supabase（不影响本地）
+    if (supabase) {
+      for (const w of words) {
+        try {
+          const { data } = await supabase.from('words').insert([{ ...w, device_id: currentDeviceId }]).select();
+          if (data && data[0]) w.id = data[0].id;
+        } catch(e) {}
+      }
+      saveWordsToStorage();
+    }
+  } else {
+    // 本地有数据，尝试从 Supabase 拉取新数据合并
+    if (supabase) {
+      try {
+        const { data } = await supabase.from('words').select('*').order('id', { ascending: true });
+        if (data && data.length > 0) {
+          const localWords = new Set(words.map(w => w.word));
+          for (const rw of data) {
+            if (!localWords.has(rw.word)) words.push(rw);
+          }
+          saveWordsToStorage();
+        }
+      } catch(e) {}
     }
   }
 
-  // 初始化 UI
   updateStats();
   renderCard();
 }
@@ -414,15 +452,32 @@ function updateProg() {
 async function judge(rem) {
   const w = queue[qi];
   const updated = srs(w, rem);
-  await updateWord(w.id, {
-    level: updated.level,
-    interval: updated.interval,
-    ease: updated.ease,
-    reps: updated.reps,
-    next_review: updated.next_review,
-    last_review: updated.last_review
-  });
-  await saveStudyLog(w.id);
+  // 更新本地
+  const idx = words.findIndex(x => x.word === w.word);
+  if (idx !== -1) words[idx] = updated;
+  saveWordsToStorage();
+  // 同步到 Supabase（可选）
+  if (supabase && w.id) {
+    try {
+      await supabase.from('words').update({
+        level: updated.level, interval: updated.interval,
+        ease: updated.ease, reps: updated.reps,
+        next_review: updated.next_review, last_review: updated.last_review
+      }).eq('id', w.id);
+    } catch(e) {}
+  }
+  // 保存学习记录
+  const todayStr = today();
+  try {
+    const logs = JSON.parse(localStorage.getItem('vl_logs_' + todayStr) || '[]');
+    if (!logs.includes(w.id || w.word)) {
+      logs.push(w.id || w.word);
+      localStorage.setItem('vl_logs_' + todayStr, JSON.stringify(logs));
+    }
+  } catch(e) {}
+  if (supabase) {
+    try { await supabase.from('study_logs').insert([{ word_id: w.id || w.word, studied_at: todayStr, device_id: currentDeviceId }]); } catch(e) {}
+  }
   doneToday++;
   await updateStats();
   const card = document.querySelector(".card");
