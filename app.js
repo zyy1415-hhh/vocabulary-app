@@ -113,6 +113,22 @@ async function loadStudyLogs(date) {
   return data || [];
 }
 
+// 批量查询一段时间内的所有学习记录（一次请求）
+async function loadStudyLogsBatch(startDate, endDate) {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('study_logs')
+    .select('studied_at')
+    .gte('studied_at', startDate)
+    .lte('studied_at', endDate);
+
+  if (error) {
+    console.error('批量加载学习记录失败:', error);
+    return [];
+  }
+  return data || [];
+}
+
 async function saveStudyLog(wordId) {
   const { error } = await supabase
     .from('study_logs')
@@ -347,14 +363,22 @@ async function updateStats() {
 }
 
 async function updateStreak() {
-  let s = 0;
   const base = new Date();
+  const end = base.toISOString().split("T")[0];
+  const start = new Date(base);
+  start.setDate(start.getDate() - 364);
+  const startStr = start.toISOString().split("T")[0];
+
+  const logs = await loadStudyLogsBatch(startStr, end);
+  const hasLog = {};
+  logs.forEach(function(l) { hasLog[l.studied_at] = true; });
+
+  let s = 0;
   for (let i = 0; i < 365; i++) {
     const d = new Date(base);
     d.setDate(d.getDate() - i);
     const ds = d.toISOString().split("T")[0];
-    const logs = await loadStudyLogs(ds);
-    if (logs.length > 0) s++;
+    if (hasLog[ds]) s++;
     else if (i > 0) break;
   }
   document.getElementById("streakBadge").textContent = "🔥 " + s + "天";
@@ -397,9 +421,12 @@ function renderCur() {
         '<div class="hint-label">🧩 根据提示猜单词</div>' +
         '<div class="sentence">' + blanked + '</div>' +
         '<div class="hint-box"><div class="hl">意大利语提示</div><div class="hm">' + escH(w.meaning) + '</div></div>' +
+        '<div class="type-area"><input class="type-input" id="typeInput" type="text" placeholder="输入单词后按 Enter..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></div>' +
         (ts > 1 ? '<div class="sent-nav">' + dots + '<span class="s-nav-label">' + (sentIdx+1) + '/' + ts + ' 例句</span></div>' : '') +
-        '<div class="tap-hint">👆 单击查看答案</div>' +
+        '<div class="tap-hint">👆 单击或按 Enter 查看答案</div>' +
       '</div>';
+    // 自动聚焦到输入框
+    setTimeout(function() { var inp = document.getElementById("typeInput"); if (inp) { inp.focus(); inp.addEventListener("keydown", function(e) { if (e.key === "Enter") { e.preventDefault(); flipCard(); } }); } }, 50);
   } else {
     const filled = w.sentences && w.sentences[sentIdx]
       ? w.sentences[sentIdx].replace(/\{\{(\w+)\}\}/gi, '<span class="filled">$1</span>')
@@ -657,14 +684,23 @@ async function renderCal() {
   const area = document.getElementById("calArea");
   const dns = ["日","一","二","三","四","五","六"];
   const base = new Date();
+  const end = base.toISOString().split("T")[0];
+  const calStart = new Date(base);
+  calStart.setDate(calStart.getDate() - 27);
+  const start = calStart.toISOString().split("T")[0];
+
+  // 一次查询28天所有记录
+  const logs = await loadStudyLogsBatch(start, end);
+  const hasLog = {};
+  logs.forEach(function(l) { hasLog[l.studied_at] = true; });
+
   let h = '<div class="cal-title">📅 学习记录</div><div class="cal-grid">';
   dns.forEach(function(d) { h += '<div class="cal-hdr">' + d + '</div>'; });
   for (let i = 27; i >= 0; i--) {
     const d = new Date(base);
     d.setDate(d.getDate() - i);
     const ds = d.toISOString().split("T")[0];
-    const logs = await loadStudyLogs(ds);
-    const cls = "cal-day" + (logs.length > 0 ? " done" : "") + (ds === today() ? " today" : "");
+    const cls = "cal-day" + (hasLog[ds] ? " done" : "") + (ds === today() ? " today" : "");
     h += '<div class="' + cls + '">' + d.getDate() + '</div>';
   }
   h += '</div>';
