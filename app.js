@@ -1,14 +1,14 @@
 ﻿// ===== Supabase 初始化（可选，失败不影响本地运行）=====
 window._supabaseClient = null;
 try {
-  if (window.window._supabaseClient) {
+  if (window.supabase) {
     window._supabaseClient = window.supabase.createClient(
       "https://zqucjgajbvanfsosyhfv.supabase.co",
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxdWNqZ2FqYnZhbmZzb3N5aGZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4MTM4MzcsImV4cCI6MjA5MzM4OTgzN30.WjsYkqm4BypEnfH5RqeloGO4X1y_dmVy8GAoUGPlXPg"
     );
   }
 } catch(e) { window._supabaseClient = null; }
-const window._supabaseClient = window._supabaseClient;
+const supabase = window._supabaseClient;
 
 // ===== 全局状态 =====
 let words = [];
