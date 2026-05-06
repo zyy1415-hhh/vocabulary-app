@@ -534,7 +534,11 @@ async function reviewAll() {
 }
 
 // ===== 页面切换 =====
+var _navLocked = false;
 function goPage(name, btn) {
+  if (_navLocked) return;
+  _navLocked = true;
+  setTimeout(function() { _navLocked = false; }, 500);
   document.querySelectorAll(".page").forEach(function(p) { p.classList.remove("active"); });
   document.querySelectorAll(".nav-item").forEach(function(b) { b.classList.remove("active"); });
   document.getElementById("page" + name.charAt(0).toUpperCase() + name.slice(1)).classList.add("active");
