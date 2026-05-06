@@ -426,7 +426,12 @@ function renderCur() {
         '<div class="tap-hint">👆 单击或按 Enter 查看答案</div>' +
       '</div>';
     // 自动聚焦到输入框
-    setTimeout(function() { var inp = document.getElementById("typeInput"); if (inp) { inp.focus(); inp.addEventListener("keydown", function(e) { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); flipCard(); } }); } }, 50);
+    setTimeout(function() { var inp = document.getElementById("typeInput"); if (inp) {
+      inp.focus();
+      inp.addEventListener("keydown", function(e) { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); flipCard(); } else { var t = inp; setTimeout(function() { t.focus(); }, 0); } });
+      inp.addEventListener("click", function(e) { e.stopPropagation(); });
+      inp.addEventListener("touchend", function(e) { e.stopPropagation(); });
+    } }, 50);
   } else {
     const filled = w.sentences && w.sentences[sentIdx]
       ? w.sentences[sentIdx].replace(/\{\{(\w+)\}\}/gi, '<span class="filled">$1</span>')
