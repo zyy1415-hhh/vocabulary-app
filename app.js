@@ -421,16 +421,14 @@ function renderCur() {
         '<div class="hint-label">🧩 根据提示猜单词</div>' +
         '<div class="sentence">' + blanked + '</div>' +
         '<div class="hint-box"><div class="hl">意大利语提示</div><div class="hm">' + escH(w.meaning) + '</div></div>' +
-        '<div class="type-area" onclick="event.stopPropagation();"><input class="type-input" id="typeInput" type="text" inputmode="text" placeholder="输入单词后按 Enter..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" onclick="event.stopPropagation();"></div>' +
         (ts > 1 ? '<div class="sent-nav">' + dots + '<span class="s-nav-label">' + (sentIdx+1) + '/' + ts + ' 例句</span></div>' : '') +
         '<div class="tap-hint">👆 单击或按 Enter 查看答案</div>' +
-      '</div>';
+      '</div>' +
+      '<div class="type-area"><input class="type-input" id="typeInput" type="text" inputmode="text" placeholder="输入单词后按 Enter..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></div>';
     // 自动聚焦到输入框
     setTimeout(function() { var inp = document.getElementById("typeInput"); if (inp) {
       inp.focus();
       inp.addEventListener("keydown", function(e) { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); flipCard(); } });
-      inp.addEventListener("click", function(e) { e.stopPropagation(); });
-      inp.addEventListener("touchend", function(e) { e.stopPropagation(); });
     } }, 50);
   } else {
     const filled = w.sentences && w.sentences[sentIdx]
