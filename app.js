@@ -1,4 +1,4 @@
-// ===== Supabase 初始化（可选，失败不影响本地运行）=====
+﻿// ===== Supabase 初始化（可选，失败不影响本地运行）=====
 let supabase = null;
 try {
   if (window.supabase) {
@@ -238,7 +238,7 @@ const BUILTIN = [
   {w:"necessary",p:"/ˈnesəsəri/",m:"necessario",s:["It's necessary to wear a seatbelt.", "Is it necessary to book in advance?"]},
   {w:"opinion",p:"/əˈpɪnjən/",m:"opinione",s:["In my opinion, this is the best option.", "Everyone is entitled to their own opinion."]},
   {w:"opportunity",p:"/ˌɒpəˈtjuːnəti/",m:"opportunità",s:["This is a great opportunity for you.", "Don't miss this opportunity to grow."]},
-  {w:"participate",p:"/pɑːˈtɪsɪpeɪt/",m:"partecipare",s:["Everyone is welcome to participate.", "She refused to participate in the debate.]},
+  {w:"participate",p:"/pɑːˈtɪsɪpeɪt/",m:"partecipare",s:["Everyone is welcome to participate.", "She refused to participate in the debate."]},
   {w:"persuade",p:"/pəˈsweɪd/",m:"convincere",s:["I finally persuaded him to see a doctor.", "Can anyone persuade her to change her mind?"]},
   {w:"prefer",p:"/prɪˈfɜː/",m:"preferire",s:["I prefer tea to coffee in the morning.", "Which do you prefer, red or blue?"]},
   {w:"prepare",p:"/prɪˈpeə/",m:"preparare",s:["We need to prepare for bad weather.", "She is preparing hard for her final exam."]},
