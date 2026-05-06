@@ -1,13 +1,14 @@
 ﻿// ===== Supabase 初始化（可选，失败不影响本地运行）=====
-let supabase = null;
+window._supabaseClient = null;
 try {
-  if (window.supabase) {
-    supabase = window.supabase.createClient(
+  if (window.window._supabaseClient) {
+    window._supabaseClient = window.supabase.createClient(
       "https://zqucjgajbvanfsosyhfv.supabase.co",
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxdWNqZ2FqYnZhbmZzb3N5aGZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4MTM4MzcsImV4cCI6MjA5MzM4OTgzN30.WjsYkqm4BypEnfH5RqeloGO4X1y_dmVy8GAoUGPlXPg"
     );
   }
-} catch(e) { supabase = null; }
+} catch(e) { window._supabaseClient = null; }
+const window._supabaseClient = window._supabaseClient;
 
 // ===== 全局状态 =====
 let words = [];
@@ -53,7 +54,7 @@ function escRe(s) {
 
 // ===== Supabase 数据操作 =====
 async function loadWords() {
-  const { data, error } = await supabase
+  const { data, error } = await window._supabaseClient
     .from('words')
     .select('*')
     .order('id', { ascending: true });
@@ -70,9 +71,9 @@ async function saveWord(word) {
   words.push(word);
   saveWordsToStorage();
   // 尝试同步到 Supabase
-  if (supabase) {
+  if (window._supabaseClient) {
     try {
-      const { data } = await supabase.from('words').insert([{ ...word, device_id: currentDeviceId }]).select();
+      const { data } = await window._supabaseClient.from('words').insert([{ ...word, device_id: currentDeviceId }]).select();
       if (data && data[0]) {
         word.id = data[0].id;
         saveWordsToStorage();
@@ -87,21 +88,21 @@ async function updateWord(id, updates) {
   const idx = words.findIndex(w => w.id === id);
   if (idx !== -1) { Object.assign(words[idx], updates); saveWordsToStorage(); }
   // 同步到 Supabase
-  if (supabase) {
-    try { await supabase.from('words').update(updates).eq('id', id); } catch(e) {}
+  if (window._supabaseClient) {
+    try { await window._supabaseClient.from('words').update(updates).eq('id', id); } catch(e) {}
   }
 }
 
 async function deleteWord(id) {
   words = words.filter(w => w.id !== id);
   saveWordsToStorage();
-  if (supabase) {
-    try { await supabase.from('words').delete().eq('id', id); } catch(e) {}
+  if (window._supabaseClient) {
+    try { await window._supabaseClient.from('words').delete().eq('id', id); } catch(e) {}
   }
 }
 
 async function loadStudyLogs(date) {
-  const { data, error } = await supabase
+  const { data, error } = await window._supabaseClient
     .from('study_logs')
     .select('word_id')
     .eq('studied_at', date);
@@ -115,8 +116,8 @@ async function loadStudyLogs(date) {
 
 // 批量查询一段时间内的所有学习记录（一次请求）
 async function loadStudyLogsBatch(startDate, endDate) {
-  if (!supabase) return [];
-  const { data, error } = await supabase
+  if (!window._supabaseClient) return [];
+  const { data, error } = await window._supabaseClient
     .from('study_logs')
     .select('studied_at')
     .gte('studied_at', startDate)
@@ -130,7 +131,7 @@ async function loadStudyLogsBatch(startDate, endDate) {
 }
 
 async function saveStudyLog(wordId) {
-  const { error } = await supabase
+  const { error } = await window._supabaseClient
     .from('study_logs')
     .insert([{ word_id: wordId, studied_at: today(), device_id: currentDeviceId }]);
 
@@ -290,10 +291,10 @@ async function initApp() {
     }
     saveWordsToStorage();
     // 尝试同步到 Supabase（不影响本地）
-    if (supabase) {
+    if (window._supabaseClient) {
       for (const w of words) {
         try {
-          const { data } = await supabase.from('words').insert([{ ...w, device_id: currentDeviceId }]).select();
+          const { data } = await window._supabaseClient.from('words').insert([{ ...w, device_id: currentDeviceId }]).select();
           if (data && data[0]) w.id = data[0].id;
         } catch(e) {}
       }
@@ -301,9 +302,9 @@ async function initApp() {
     }
   } else {
     // 本地有数据，尝试从 Supabase 拉取新数据合并
-    if (supabase) {
+    if (window._supabaseClient) {
       try {
-        const { data } = await supabase.from('words').select('*').order('id', { ascending: true });
+        const { data } = await window._supabaseClient.from('words').select('*').order('id', { ascending: true });
         if (data && data.length > 0) {
           const localWords = new Set(words.map(w => w.word));
           for (const rw of data) {
@@ -484,9 +485,9 @@ async function judge(rem) {
   if (idx !== -1) words[idx] = updated;
   saveWordsToStorage();
   // 同步到 Supabase（可选）
-  if (supabase && w.id) {
+  if (window._supabaseClient && w.id) {
     try {
-      await supabase.from('words').update({
+      await window._supabaseClient.from('words').update({
         level: updated.level, interval: updated.interval,
         ease: updated.ease, reps: updated.reps,
         next_review: updated.next_review, last_review: updated.last_review
@@ -502,8 +503,8 @@ async function judge(rem) {
       localStorage.setItem('vl_logs_' + todayStr, JSON.stringify(logs));
     }
   } catch(e) {}
-  if (supabase) {
-    try { await supabase.from('study_logs').insert([{ word_id: w.id || w.word, studied_at: todayStr, device_id: currentDeviceId }]); } catch(e) {}
+  if (window._supabaseClient) {
+    try { await window._supabaseClient.from('study_logs').insert([{ word_id: w.id || w.word, studied_at: todayStr, device_id: currentDeviceId }]); } catch(e) {}
   }
   doneToday++;
   await updateStats();
