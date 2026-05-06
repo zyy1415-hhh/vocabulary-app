@@ -8,7 +8,6 @@ try {
     );
   }
 } catch(e) { window._supabaseClient = null; }
-const supabase = window._supabaseClient;
 
 // ===== 全局状态 =====
 let words = [];
